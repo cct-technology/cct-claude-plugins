@@ -1,0 +1,12 @@
+FAIL  QK010  Docs change with mapped code (enforced)
+      - internal/config/load.go: docs/reference/settings.md must change too
+      - no Docs-Impact trailer in the range
+      fix: Update the mapped docs, or add a `Docs-Impact: none — <reason>` commit trailer.
+WARN  QK110  CODEOWNERS covers every top-level path (advisory)
+      - scripts: no owner
+      fix: Add a CODEOWNERS line for the path.
+PASS  QK001  Manifest is valid (enforced)
+SKIP  QK030  No breaking OpenAPI changes (enforced)
+      skipped: oasdiff not installed
+
+1 fail, 1 warn, 1 pass, 1 skipped (blocking)

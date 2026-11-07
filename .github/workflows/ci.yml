@@ -22,3 +22,12 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test ./...
+      - name: Generated reference docs are current
+        if: runner.os == 'Linux'
+        run: |
+          go run ./cmd/gen-docs
+          if [ -n "$(git status --porcelain -- docs/reference/)" ]; then
+            git status --porcelain -- docs/reference/
+            echo "::error::docs/reference is out of date. Run: go run ./cmd/gen-docs"
+            exit 1
+          fi

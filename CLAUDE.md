@@ -38,6 +38,7 @@ How the pieces connect (details in the SPEC section named):
 ## Commands
 - `go test ./...` — all tests
 - `go test ./internal/<pkg> -run '^TestName$'` — single test
+- `go test ./internal/check -update` — rewrite golden files after an intended output change; review the diff
 - Hook scripts: pipe a recorded hook-input JSON file into the script (SPEC §9)
 - `go run ./cmd/qk check --format text` — run against this repo (dogfood)
 - `go run ./cmd/gen-docs` — regenerate reference docs; CI fails if they differ

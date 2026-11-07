@@ -1,0 +1,2 @@
+# Golden files and generated docs are compared byte for byte, so keep LF on every OS.
+* text=auto eol=lf
