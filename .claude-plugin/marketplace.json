@@ -1,0 +1,14 @@
+{
+  "name": "cct-claude-plugins",
+  "description": "Claude Code plugins from CCT Technology.",
+  "owner": {
+    "name": "CCT Technology"
+  },
+  "plugins": [
+    {
+      "name": "quality-kit",
+      "source": "./plugins/quality-kit",
+      "description": "Keeps docs, contracts, threat models, test plans and operational readiness current while agents build software."
+    }
+  ]
+}

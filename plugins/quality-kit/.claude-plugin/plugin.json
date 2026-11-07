@@ -1,0 +1,10 @@
+{
+  "name": "quality-kit",
+  "displayName": "Quality Kit",
+  "version": "0.1.0",
+  "description": "Keeps docs, contracts, threat models, test plans and operational readiness current while agents build software.",
+  "author": {
+    "name": "CCT Technology"
+  },
+  "repository": "https://github.com/rkvalvaa/cct-claude-plugins"
+}
