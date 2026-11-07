@@ -1,0 +1,8 @@
+Quality Kit: 1 fail, 1 warn.
+QK010 fail: Docs change with mapped code
+- internal/config/load.go: docs/reference/settings.md must change too
+- no Docs-Impact trailer in the range
+Fix: Update the mapped docs, or add a `Docs-Impact: none — <reason>` commit trailer. More: qk explain QK010
+QK110 warn: CODEOWNERS covers every top-level path
+- scripts: no owner
+Fix: Add a CODEOWNERS line for the path. More: qk explain QK110

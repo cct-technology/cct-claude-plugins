@@ -1,0 +1,57 @@
+{
+  "results": [
+    {
+      "rule": "QK010",
+      "check": "docs.impact",
+      "title": "Docs change with mapped code",
+      "mode": "enforced",
+      "status": "fail",
+      "findings": [
+        {
+          "file": "internal/config/load.go",
+          "message": "docs/reference/settings.md must change too"
+        },
+        {
+          "message": "no Docs-Impact trailer in the range"
+        }
+      ],
+      "fix": "Update the mapped docs, or add a `Docs-Impact: none — <reason>` commit trailer."
+    },
+    {
+      "rule": "QK110",
+      "check": "ownership.codeowners",
+      "title": "CODEOWNERS covers every top-level path",
+      "mode": "advisory",
+      "status": "warn",
+      "findings": [
+        {
+          "file": "scripts",
+          "message": "no owner"
+        }
+      ],
+      "fix": "Add a CODEOWNERS line for the path."
+    },
+    {
+      "rule": "QK001",
+      "check": "manifest.valid",
+      "title": "Manifest is valid",
+      "mode": "enforced",
+      "status": "pass"
+    },
+    {
+      "rule": "QK030",
+      "check": "contracts.breaking",
+      "title": "No breaking OpenAPI changes",
+      "mode": "enforced",
+      "status": "skipped",
+      "reason": "oasdiff not installed"
+    }
+  ],
+  "summary": {
+    "pass": 1,
+    "warn": 1,
+    "fail": 1,
+    "skipped": 1
+  },
+  "blocking": true
+}
