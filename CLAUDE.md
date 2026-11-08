@@ -6,6 +6,7 @@ This repo (`cct-claude-plugins`) is a Claude Code plugin marketplace. Its first 
 
 ## Non-negotiables
 - The plugin must work standalone in any repo with zero configuration. Never add a dependency on other CCT repos or services.
+- Host-neutral: `qk` depends only on git. Anything specific to GitHub, GitLab or another host (CI, PR comments, merge gates) is an optional add-on.
 - `qk` (Go CLI) decides pass/fail. Skills never decide pass/fail and never invent reference facts.
 - Hooks fail open: tooling errors warn and exit 0. Only real findings block, and only in `enforced` mode.
 - Exceptions need a person: waivers and docs-impact notes are approved by a human and logged, and changes to `quality.yaml` need a human's approval. Claude never grants one for itself.

@@ -24,9 +24,14 @@ This adds an entry to `.quality/waivers.yaml` at the repository root and an appr
 A person, not Claude:
 
 - **When Claude asks to add a waiver**, Claude Code prompts you first. The same prompt appears if Claude changes anything under `.quality/` or edits `quality.yaml`, because a check can be turned off there. Read the reason before you approve. With no person to answer, as in `claude -p`, the request is denied.
-- **At review**, make `.quality/` and `quality.yaml` CODEOWNERS paths, so a change to an exception needs a person's approval on the pull request.
+- **At merge**, require a person's review of `.quality/` and `quality.yaml`. Only your git host can block a merge, so this is a setting there:
+  - **GitHub:** list those paths in CODEOWNERS and turn on "Require review from Code Owners" in the branch rule for your default branch.
+  - **GitLab (Premium or Ultimate):** list those paths in CODEOWNERS and turn on "Require approval from code owners" in the branch rule.
+  - **Other hosts:** use the host's required reviewers for a path, if it has them.
 
-The prompt is best effort: it reads the command text. The review is the backstop.
+CODEOWNERS on its own only names reviewers; it does not block a merge.
+
+The prompt is best effort: it reads the command text. Review at merge is the backstop. Where your host can't enforce a review, the prompt and the log are all you have.
 
 ## The log
 
