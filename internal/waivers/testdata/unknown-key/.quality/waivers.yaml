@@ -1,0 +1,5 @@
+waivers:
+  - rule: QK010
+    reson: typo
+    owner: rkvalvaa
+    expires: 2099-12-31

@@ -1,0 +1,5 @@
+waivers:
+  - rule: QK010
+    reason: Too old
+    owner: rkvalvaa
+    expires: 2020-01-31

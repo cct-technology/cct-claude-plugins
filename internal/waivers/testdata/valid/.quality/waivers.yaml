@@ -1,0 +1,11 @@
+# Exceptions we have agreed to.
+waivers:
+  - rule: QK010
+    paths: ["internal/legacy/**"]
+    reason: Legacy module is being rewritten
+    owner: rkvalvaa
+    expires: 2099-12-31
+  - rule: QK110
+    reason: Quoted date
+    owner: tech-lead
+    expires: "2099-06-30"

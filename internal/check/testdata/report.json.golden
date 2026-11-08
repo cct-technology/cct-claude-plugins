@@ -39,6 +39,22 @@
       "status": "pass"
     },
     {
+      "rule": "QK020",
+      "check": "generated.current",
+      "title": "Generated files are current",
+      "mode": "enforced",
+      "status": "pass",
+      "waived": [
+        {
+          "file": "docs/reference/settings.md",
+          "message": "differs from generator output",
+          "owner": "rk",
+          "expires": "2026-12-31",
+          "reason": "generator moves in CCT-1"
+        }
+      ]
+    },
+    {
       "rule": "QK030",
       "check": "contracts.breaking",
       "title": "No breaking OpenAPI changes",
@@ -48,10 +64,11 @@
     }
   ],
   "summary": {
-    "pass": 1,
+    "pass": 2,
     "warn": 1,
     "fail": 1,
-    "skipped": 1
+    "skipped": 1,
+    "waived": 1
   },
   "blocking": true
 }

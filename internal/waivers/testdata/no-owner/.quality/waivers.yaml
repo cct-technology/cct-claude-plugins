@@ -1,0 +1,4 @@
+waivers:
+  - rule: QK010
+    reason: Nobody owns this
+    expires: 2099-12-31

@@ -1,0 +1,5 @@
+waivers:
+  - rule: QK100
+    reason: Trying to silence the check on waivers
+    owner: rkvalvaa
+    expires: 2099-12-31

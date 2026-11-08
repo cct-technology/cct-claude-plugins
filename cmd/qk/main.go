@@ -12,6 +12,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
 )
 
 // version is set at release time with -ldflags "-X main.version=<tag>".
@@ -76,15 +78,14 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 			if !slices.Contains(check.Formats, format) {
 				return fmt.Errorf("unknown --format %q (want one of %s)", format, strings.Join(check.Formats, ", "))
 			}
-			cwd, err := os.Getwd()
+			root, err := repoRoot()
 			if err != nil {
 				return err
 			}
-			root, err := changes.Root(cwd)
-			if err != nil {
-				root = cwd // not a git repo: check the folder qk runs in
+			ctx := check.Context{
+				Root: root, Manifest: manifest.Load(root), ChangedOnly: changedOnly,
+				Waivers: waivers.Load(root), Today: time.Now(),
 			}
-			ctx := check.Context{Root: root, Manifest: manifest.Load(root), ChangedOnly: changedOnly}
 			ctx.Changes, ctx.ChangesErr = changes.Compute(root, base)
 			if errors.Is(ctx.ChangesErr, changes.ErrBadBase) {
 				return ctx.ChangesErr // the user named a base that does not exist: usage error
@@ -103,6 +104,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	checkCmd.Flags().StringVar(&base, "base", "", "compare against the merge-base with this ref (default: the default branch, from origin/HEAD, main or master)")
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
 	root.AddCommand(checkCmd)
+	root.AddCommand(newWaiverCmd(reg))
 
 	root.AddCommand(&cobra.Command{
 		Use:   "explain <rule-id>",
@@ -119,4 +121,58 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	})
 
 	return root
+}
+
+// repoRoot is the git top level, or the working directory outside git.
+func repoRoot() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	if root, err := changes.Root(cwd); err == nil {
+		return root, nil
+	}
+	return cwd, nil
+}
+
+func newWaiverCmd(reg []check.Rule) *cobra.Command {
+	var w waivers.Waiver
+	add := &cobra.Command{
+		Use:   "add <rule-id>",
+		Short: "Record an agreed, owned, time-limited exception to a rule",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			w.Rule = strings.ToUpper(args[0])
+			known := w.Rule == waivers.NeverWaived // reported below as "cannot be waived"
+			for _, r := range reg {
+				known = known || r.ID == w.Rule
+			}
+			if !known {
+				return fmt.Errorf("unknown rule %s", w.Rule)
+			}
+			if problems := w.Problems(time.Now()); len(problems) > 0 {
+				return errors.New(strings.Join(problems, "; "))
+			}
+			root, err := repoRoot()
+			if err != nil {
+				return err
+			}
+			if err := waivers.Add(root, w); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Waived %s until %s in %s\n", w.Rule, w.Expires, waivers.FileName)
+			return nil
+		},
+	}
+	add.Flags().StringVar(&w.Reason, "reason", "", "why this exception is acceptable (required)")
+	add.Flags().StringVar(&w.Owner, "owner", "", "who answers for this exception (required)")
+	add.Flags().StringVar(&w.Expires, "expires", "", "last day the waiver applies, YYYY-MM-DD (required)")
+	add.Flags().StringArrayVar(&w.Paths, "path", nil, "glob of files the waiver covers; repeatable (default: every finding of the rule)")
+	for _, f := range []string{"reason", "owner", "expires"} {
+		_ = add.MarkFlagRequired(f)
+	}
+
+	waiver := &cobra.Command{Use: "waiver", Short: "Manage waivers in " + waivers.FileName}
+	waiver.AddCommand(add)
+	return waiver
 }

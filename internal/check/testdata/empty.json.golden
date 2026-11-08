@@ -4,7 +4,8 @@
     "pass": 0,
     "warn": 0,
     "fail": 0,
-    "skipped": 0
+    "skipped": 0,
+    "waived": 0
   },
   "blocking": false
 }

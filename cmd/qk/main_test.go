@@ -10,6 +10,7 @@ import (
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
 )
 
 func runQK(t *testing.T, reg []check.Rule, args ...string) (code int, stdout, stderr string) {
@@ -294,5 +295,107 @@ func TestCheckBadBaseIsAUsageError(t *testing.T) {
 
 	if code != 2 || !strings.Contains(errOut, "no-such-ref") {
 		t.Errorf("exit code = %d, stderr = %q, want 2 naming the ref", code, errOut)
+	}
+}
+
+func writeWaiver(t *testing.T, dir, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, ".quality"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".quality", "waivers.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCheckAppliesAWaiver(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	dir, _ := os.Getwd()
+	writeWaiver(t, dir, "waivers:\n  - rule: QK010\n    paths: [\"*.go\"]\n    reason: being rewritten\n    owner: rk\n    expires: 2099-12-31\n")
+
+	code, out, _ := runQK(t, []check.Rule{failing}, "check")
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0 with the only finding waived", code)
+	}
+	if !strings.Contains(out, "PASS  QK010") || !strings.Contains(out, "waived: a.go: docs must change (rk until 2099-12-31: being rewritten)") {
+		t.Errorf("stdout = %q", out)
+	}
+}
+
+func TestCheckIgnoresAnExpiredWaiverAndQK100ReportsIt(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	dir, _ := os.Getwd()
+	writeWaiver(t, dir, "waivers:\n  - rule: QK010\n    reason: too old\n    owner: rk\n    expires: 2000-01-01\n")
+
+	code, out, _ := runQK(t, append(rules.All(), failing), "check")
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(out, "FAIL  QK010") || !strings.Contains(out, "FAIL  QK100") || !strings.Contains(out, "expired on 2000-01-01") {
+		t.Errorf("stdout = %q", out)
+	}
+}
+
+func TestWaiverAddWritesAtTheRepoRootFromASubfolder(t *testing.T) {
+	dir := gitRepo(t)
+	sub := filepath.Join(dir, "internal", "pkg")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+
+	code, out, errOut := runQK(t, rules.All(), "waiver", "add", "qk001",
+		"--reason", "being fixed", "--owner", "rk", "--expires", "2099-12-31", "--path", "a/**", "--path", "b/**")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
+	}
+	if !strings.Contains(out, "QK001") {
+		t.Errorf("stdout = %q", out)
+	}
+	l := waivers.Load(dir)
+	if len(l.Problems) != 0 || len(l.Waivers) != 1 {
+		t.Fatalf("Load = %+v", l)
+	}
+	if w := l.Waivers[0]; w.Rule != "QK001" || len(w.Paths) != 2 || w.Owner != "rk" || w.Expires != "2099-12-31" {
+		t.Errorf("waiver = %+v", w)
+	}
+	if _, err := os.Stat(filepath.Join(sub, ".quality")); err == nil {
+		t.Error("wrote .quality in the subfolder")
+	}
+}
+
+func TestWaiverAddUsageErrors(t *testing.T) {
+	good := []string{"--reason", "r", "--owner", "o", "--expires", "2099-12-31"}
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"unknown rule", append([]string{"QK999"}, good...), "unknown rule QK999"},
+		{"QK100", append([]string{"QK100"}, good...), "QK100 cannot be waived"},
+		{"bad date", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "soon"}, "expires must be a date"},
+		{"past date", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "2000-01-01"}, "expired on 2000-01-01"},
+		{"missing reason", []string{"QK001", "--owner", "o", "--expires", "2099-12-31"}, "reason"},
+		{"missing owner", []string{"QK001", "--reason", "r", "--expires", "2099-12-31"}, "owner"},
+		{"missing expires", []string{"QK001", "--reason", "r", "--owner", "o"}, "expires"},
+		{"blank owner", []string{"QK001", "--reason", "r", "--owner", " ", "--expires", "2099-12-31"}, "no owner"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inRepo(t, "")
+			dir, _ := os.Getwd()
+
+			code, _, errOut := runQK(t, rules.All(), append([]string{"waiver", "add"}, tt.args...)...)
+
+			if code != 2 || !strings.Contains(errOut, tt.want) {
+				t.Errorf("exit code = %d, stderr = %q, want 2 and %q", code, errOut, tt.want)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".quality")); err == nil {
+				t.Error("wrote a waiver despite the error")
+			}
+		})
 	}
 }

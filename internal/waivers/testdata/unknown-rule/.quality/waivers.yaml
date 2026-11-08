@@ -1,0 +1,5 @@
+waivers:
+  - rule: QK999
+    reason: A rule from a newer qk
+    owner: rkvalvaa
+    expires: 2099-12-31
