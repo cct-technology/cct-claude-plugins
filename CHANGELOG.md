@@ -4,6 +4,8 @@
 
 ### Added
 
+- `qk check` finds the repository root from any subfolder and computes what changed: files changed between the merge-base with the default branch (`origin/HEAD`, then `main`, then `master`) and the working tree, including uncommitted and untracked files, plus commit trailers such as `Docs-Impact`. Outside git, checks that need this are skipped with the reason.
+- `qk check --base <ref>` compares against the merge-base with another ref; a ref that names no commit exits 2. `qk check --changed` limits whole-repo checks to changed files.
 - `quality.yaml` manifest, version 1, validated against `plugins/quality-kit/schemas/quality.schema.json`. `maturity` and `modes` now set each check's mode; with no manifest, every check stays advisory. An invalid manifest is treated as bronze, so QK001 blocks.
 - QK001 (`manifest.valid`): `quality.yaml` is valid. Each problem names the key path and what is allowed. A `modes` key that matches no check is a warning, so a manifest written for a newer `qk` does not block an older one.
 - Generated `docs/reference/manifest.md` listing every key, and a how-to for configuring `quality.yaml`.

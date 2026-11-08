@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 )
 
@@ -59,8 +60,11 @@ type Result struct {
 
 // Context is what a rule can see.
 type Context struct {
-	Root     string          // repository root
-	Manifest manifest.Loaded // quality.yaml, if any
+	Root        string          // repository root
+	Manifest    manifest.Loaded // quality.yaml, if any
+	Changes     *changes.Set    // what changed against the base; nil when ChangesErr is set
+	ChangesErr  error           // why there is no change set: rules that need one skip with it as reason
+	ChangedOnly bool            // --changed: checks that scan the whole repo look only at changed files
 }
 
 // Rule is one registered check. IDs are stable and never reused.

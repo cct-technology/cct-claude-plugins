@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
@@ -63,7 +64,10 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 		},
 	})
 
-	var format string
+	var (
+		format, base string
+		changedOnly  bool
+	)
 	checkCmd := &cobra.Command{
 		Use:   "check",
 		Short: "Run every check and report what is missing or stale",
@@ -72,13 +76,20 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 			if !slices.Contains(check.Formats, format) {
 				return fmt.Errorf("unknown --format %q (want one of %s)", format, strings.Join(check.Formats, ", "))
 			}
-			// ponytail: the working directory is the repo root until CCT-3426 finds the git root.
-			root, err := os.Getwd()
+			cwd, err := os.Getwd()
 			if err != nil {
 				return err
 			}
-			m := manifest.Load(root)
-			rep := check.Run(reg, check.ConfigFrom(m), check.Context{Root: root, Manifest: m})
+			root, err := changes.Root(cwd)
+			if err != nil {
+				root = cwd // not a git repo: check the folder qk runs in
+			}
+			ctx := check.Context{Root: root, Manifest: manifest.Load(root), ChangedOnly: changedOnly}
+			ctx.Changes, ctx.ChangesErr = changes.Compute(root, base)
+			if errors.Is(ctx.ChangesErr, changes.ErrBadBase) {
+				return ctx.ChangesErr // the user named a base that does not exist: usage error
+			}
+			rep := check.Run(reg, check.ConfigFrom(ctx.Manifest), ctx)
 			if err := check.WriteReport(cmd.OutOrStdout(), rep, format); err != nil {
 				return err
 			}
@@ -89,6 +100,8 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 		},
 	}
 	checkCmd.Flags().StringVar(&format, "format", "text", "output format: "+strings.Join(check.Formats, ", "))
+	checkCmd.Flags().StringVar(&base, "base", "", "compare against the merge-base with this ref (default: the default branch, from origin/HEAD, main or master)")
+	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
 	root.AddCommand(checkCmd)
 
 	root.AddCommand(&cobra.Command{
