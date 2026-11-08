@@ -1,0 +1,30 @@
+# Asset names are part of the contract with plugins/quality-kit/bin/qk, which
+# builds the same names to download a release. Change them together.
+version: 2
+
+project_name: qk
+
+builds:
+  - main: ./cmd/qk
+    binary: qk
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      # .Version has no leading v, so qk version matches plugin.json.
+      - -s -w -X main.version={{ .Version }}
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  # tar.gz on Windows too: the shim then has one way to unpack.
+  - formats: [tar.gz]
+    name_template: "qk_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  disable: true

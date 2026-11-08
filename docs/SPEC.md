@@ -154,7 +154,9 @@ Every check returns `pass | warn | fail | skipped(reason)`. `skipped` is never a
 
 ### The `bin/qk` shim
 
-Plugins are copied to a cache on install, so the shim resolves the binary in this order: `qk` on `PATH` at the required version → `~/.cache/quality-kit/<version>/qk` → download the matching release asset with checksum verification → otherwise print a warning to stderr and exit 0.
+Plugins are copied to a cache on install, so the shim resolves the binary in this order: `qk` on `PATH` at the required version → `~/.cache/quality-kit/<version>/qk` (`$CLAUDE_PLUGIN_DATA/<version>/qk` when set, because that survives plugin updates) → download the matching release asset with checksum verification → otherwise print a warning to stderr and exit 0.
+
+The required version is `version` in `plugin.json`, the only place it is pinned. The release workflow fails when the tag does not match it. The shim is POSIX `sh`, so on Windows it needs Git Bash.
 
 ## 5. Hooks
 

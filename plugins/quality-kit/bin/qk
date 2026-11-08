@@ -1,0 +1,116 @@
+#!/bin/sh
+# Finds the qk binary this plugin version needs and runs it: qk on PATH, then
+# the cache, then a checksum-verified download from the release. When none of
+# those works it warns on stderr and exits 0, because tooling problems must
+# never block (docs/SPEC.md, design rule 7). Warnings stay off stdout, which
+# hooks parse.
+#
+# The required version is the "version" in the plugin's plugin.json.
+
+# Another copy of this shim is not a real qk. See is_required.
+[ -z "${QK_SHIM_PROBE:-}" ] || exit 1
+
+warn() {
+	echo "quality-kit: $1. qk did not run." >&2
+	exit 0
+}
+
+# Claude Code may hand Git Bash C:\ or C:/ paths.
+to_posix() {
+	if command -v cygpath >/dev/null 2>&1; then
+		cygpath -u "$1"
+	else
+		printf '%s\n' "$1"
+	fi
+}
+
+manifest=$(dirname "$(to_posix "$0")")/../.claude-plugin/plugin.json
+version=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" 2>/dev/null | head -n 1)
+[ -n "$version" ] || warn "no version found in $manifest"
+
+case $(uname -s) in
+Linux) os=linux exe= ;;
+Darwin) os=darwin exe= ;;
+MINGW* | MSYS* | CYGWIN*) os=windows exe=.exe ;;
+*) os='' exe= ;;
+esac
+
+# True when $1 runs and reports the required version. stdin is closed so a
+# different program named qk cannot eat a hook's input or wait for it.
+is_required() {
+	case $(QK_SHIM_PROBE=1 "$1" version 2>/dev/null </dev/null) in
+	"qk $version "*) return 0 ;;
+	esac
+	return 1
+}
+
+# Walks PATH instead of using command -v: plugin bin/ is on the Bash tool's
+# PATH, so the first qk found can be this shim, hiding a real one further on.
+IFS=:
+set -f
+for dir in $PATH; do
+	case $dir in
+	/*) ;;
+	*) continue ;; # a relative entry would run a qk from the checked repository
+	esac
+	if [ -f "$dir/qk$exe" ] && is_required "$dir/qk$exe"; then
+		exec "$dir/qk$exe" "$@"
+	fi
+done
+unset IFS
+set +f
+
+# ponytail: old versions stay in the cache, prune when their size matters.
+if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then
+	cache=$(to_posix "$CLAUDE_PLUGIN_DATA")/$version
+else
+	cache=$HOME/.cache/quality-kit/$version
+fi
+cached=$cache/qk$exe
+if is_required "$cached"; then
+	exec "$cached" "$@"
+fi
+
+case $(uname -m) in
+x86_64 | amd64) arch=amd64 ;;
+arm64 | aarch64) arch=arm64 ;;
+*) arch='' ;;
+esac
+[ -n "$os" ] && [ -n "$arch" ] || warn "no qk release for $(uname -s) $(uname -m)"
+
+asset=qk_${version}_${os}_${arch}.tar.gz
+base=https://github.com/rkvalvaa/cct-claude-plugins/releases/download/v$version
+
+mkdir -p "$cache" 2>/dev/null || warn "could not create $cache"
+# In the cache directory so the final mv is atomic and concurrent hooks are safe.
+tmp=$(mktemp -d "$cache/download.XXXXXX") || warn "could not create a temporary directory in $cache"
+trap 'rm -rf "$tmp"' EXIT
+
+# ponytail: curl only, add wget when a supported platform lacks curl.
+fetch() {
+	curl -fsSL --proto '=https' --tlsv1.2 --connect-timeout 5 --max-time 60 -o "$tmp/$1" "$base/$1"
+}
+fetch "$asset" && fetch checksums.txt || warn "could not download $asset from $base"
+
+if command -v sha256sum >/dev/null 2>&1; then
+	actual=$(sha256sum "$tmp/$asset")
+else
+	actual=$(shasum -a 256 "$tmp/$asset")
+fi
+actual=${actual%% *}
+expected=$(awk -v name="$asset" '$2 == name { print $1 }' "$tmp/checksums.txt")
+if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+	warn "checksum mismatch for $asset, refusing it"
+fi
+
+tar -xzf "$tmp/$asset" -C "$tmp" "qk$exe" 2>/dev/null || warn "could not unpack $asset"
+is_required "$tmp/qk$exe" || warn "$asset does not run as qk $version"
+
+# On Windows mv fails while another session runs this qk; the copy there is good.
+mv -f "$tmp/qk$exe" "$cached" 2>/dev/null
+rm -rf "$tmp"
+trap - EXIT
+if is_required "$cached"; then
+	exec "$cached" "$@"
+fi
+warn "could not install qk in $cache"
