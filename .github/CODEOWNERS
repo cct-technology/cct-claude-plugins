@@ -1,0 +1,4 @@
+# Every path has an owner. Exceptions are named so a change to one always asks for this review.
+*               @rkvalvaa
+/.quality/      @rkvalvaa
+/quality.yaml   @rkvalvaa

@@ -9,6 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # qk compares against the merge-base with main
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go run ./cmd/qk check --base origin/main
+
   go:
     strategy:
       fail-fast: false
