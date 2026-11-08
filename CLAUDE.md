@@ -48,5 +48,5 @@ How the pieces connect (details in the SPEC section named):
 
 ## Done means
 - Tests pass, generated docs committed, `qk check` passes on this repo at `silver`.
-- Docs updated: how-to for any user-visible change, reference regenerated. At `silver`, QK010 is enforced: a commit touching a path in `impact_map` needs the mapped doc changed or a `Docs-Impact: none — <reason>` commit trailer.
+- Docs updated: how-to for any user-visible change, reference regenerated. At `silver`, QK010 is enforced: a commit touching a path in `impact_map` needs the mapped doc changed, or a person's approval through `qk docs-impact none`.
 - Changelog entry under `## Unreleased` in `CHANGELOG.md` (create it at the repo root if missing).

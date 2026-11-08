@@ -457,3 +457,180 @@ func TestHookFailsOpenOnBadInput(t *testing.T) {
 		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want exit 0 and a warning", code, out, errOut)
 	}
 }
+
+const impactManifest = "version: 1\nmaturity: silver\ndocs:\n  impact_map:\n    - paths: [\"internal/config/**\"]\n      docs: [\"docs/settings.md\"]\n"
+
+func gitIn(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func put(t *testing.T, dir, path, content string) {
+	t.Helper()
+	full := filepath.Join(dir, filepath.FromSlash(path))
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// impactRepo is a silver repo on branch feature with a mapped code change and no doc change.
+func impactRepo(t *testing.T) string {
+	t.Helper()
+	dir := gitRepo(t)
+	put(t, dir, "quality.yaml", impactManifest)
+	put(t, dir, "internal/config/load.go", "package config\n")
+	return dir
+}
+
+func approveNote(t *testing.T, reason string) {
+	t.Helper()
+	if code, _, errOut := runQK(t, rules.All(), "docs-impact", "none", "--reason", reason, "--approved-by", "a person"); code != 0 {
+		t.Fatalf("docs-impact: exit %d, stderr = %q", code, errOut)
+	}
+}
+
+func TestQK010BlocksAMappedChangeWithoutDocs(t *testing.T) {
+	impactRepo(t)
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 1 || !strings.Contains(out, "FAIL  QK010") || !strings.Contains(out, "docs/settings.md") {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+func TestQK010PassesWhenTheDocChanges(t *testing.T) {
+	dir := impactRepo(t)
+	put(t, dir, "docs/settings.md", "# Settings\n")
+
+	if code, out, _ := runQK(t, rules.All(), "check"); code != 0 {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+func TestQK010PassesWithAnApprovedUncommittedNote(t *testing.T) {
+	dir := impactRepo(t)
+
+	approveNote(t, "internal refactor")
+
+	if code, out, _ := runQK(t, rules.All(), "check"); code != 0 {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".quality", "docs-impact", "feature.md")); err != nil {
+		t.Error(err)
+	}
+	if l := waivers.Load(dir); len(l.Log) != 1 || l.Log[0].ApprovedBy != "a person" || l.Log[0].Identity != "Test <test@example.com>" {
+		t.Errorf("log = %+v", l.Log)
+	}
+}
+
+func TestQK010RejectsAHandWrittenNote(t *testing.T) {
+	dir := impactRepo(t)
+	put(t, dir, ".quality/docs-impact/feature.md", "Docs-Impact: none — trust me\n")
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 1 || !strings.Contains(out, "no approval") {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+func TestQK010RejectsANoteEditedAfterApproval(t *testing.T) {
+	dir := impactRepo(t)
+	approveNote(t, "internal refactor")
+	put(t, dir, ".quality/docs-impact/feature.md", "Docs-Impact: none — something else\n")
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 1 || !strings.Contains(out, "no approval") {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+func TestQK010IgnoresANoteAlreadyOnMain(t *testing.T) {
+	dir := gitRepo(t)
+	gitIn(t, dir, "checkout", "-q", "main")
+	put(t, dir, "quality.yaml", impactManifest)
+	approveNote(t, "from an earlier branch")
+	gitIn(t, dir, "add", "-A")
+	gitIn(t, dir, "commit", "-q", "-m", "earlier work")
+	gitIn(t, dir, "checkout", "-q", "-B", "feature")
+	put(t, dir, "internal/config/load.go", "package config\n")
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 1 || !strings.Contains(out, "FAIL  QK010") {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+// CI checks out a detached merge commit, so a note must count without matching the branch name.
+func TestQK010AcceptsTheNoteOnADetachedHead(t *testing.T) {
+	dir := impactRepo(t)
+	approveNote(t, "internal refactor")
+	gitIn(t, dir, "add", "-A")
+	gitIn(t, dir, "commit", "-q", "-m", "work")
+	gitIn(t, dir, "checkout", "-q", "--detach")
+
+	if code, out, _ := runQK(t, rules.All(), "check", "--base", "main"); code != 0 {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+func TestQK010FindingCanBeWaivedByPath(t *testing.T) {
+	impactRepo(t)
+	if code, _, errOut := runQK(t, rules.All(), "waiver", "add", "QK010", "--path", "internal/config/**",
+		"--reason", "being rewritten", "--owner", "rk", "--expires", "2099-12-31", "--approved-by", "a person"); code != 0 {
+		t.Fatalf("waiver add: exit %d, stderr = %q", code, errOut)
+	}
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 0 || !strings.Contains(out, "PASS  QK010") || !strings.Contains(out, "waived: internal/config/load.go") {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+func TestDocsImpactUsageErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"missing reason", []string{"--approved-by", "a"}, "reason"},
+		{"missing approver", []string{"--reason", "r"}, "approved-by"},
+		{"blank reason", []string{"--reason", " ", "--approved-by", "a"}, "no reason"},
+		{"blank approver", []string{"--reason", "r", "--approved-by", " "}, "no approver"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := gitRepo(t)
+
+			code, _, errOut := runQK(t, rules.All(), append([]string{"docs-impact", "none"}, tt.args...)...)
+
+			if code != 2 || !strings.Contains(errOut, tt.want) {
+				t.Errorf("exit code = %d, stderr = %q, want 2 and %q", code, errOut, tt.want)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".quality")); err == nil {
+				t.Error("wrote a note despite the error")
+			}
+		})
+	}
+}
+
+func TestDocsImpactNeedsGit(t *testing.T) {
+	inRepo(t, "")
+	dir, _ := os.Getwd()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+
+	code, _, errOut := runQK(t, rules.All(), "docs-impact", "none", "--reason", "r", "--approved-by", "a")
+
+	if code != 2 || !strings.Contains(errOut, "git") {
+		t.Errorf("exit code = %d, stderr = %q", code, errOut)
+	}
+}

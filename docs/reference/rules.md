@@ -16,6 +16,16 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 
 **How to fix.** Correct the key or value named in the finding. Every allowed key and value is listed in `docs/reference/manifest.md`.
 
+## QK010 — Docs change with the code they describe
+
+- Check key: `docs.impact`
+- Phase: 1
+- Enforced by default at: silver, gold
+
+**What it checks.** When a changed file matches `paths` in an `impact_map` entry, at least one file matching that entry's `docs` must change on the same branch. A change that truly needs no docs can carry a note written by `qk docs-impact none`. The note counts only while it is part of the change and matches a person's approval in `.quality/exceptions-log.jsonl`, so a hand-written or later-edited note does not count.
+
+**How to fix.** Update the mapped docs. If this change needs none, ask a person to approve `qk docs-impact none --reason <why> --approved-by <person>`.
+
 ## QK100 — Waivers are valid, owned and not expired
 
 - Check key: `waivers.valid`

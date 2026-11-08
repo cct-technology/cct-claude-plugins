@@ -35,6 +35,18 @@ type Manifest struct {
 	Version  int               `yaml:"version"`
 	Maturity string            `yaml:"maturity"`
 	Modes    map[string]string `yaml:"modes"`
+	Docs     Docs              `yaml:"docs"`
+}
+
+// Docs is the docs section of the manifest.
+type Docs struct {
+	ImpactMap []ImpactEntry `yaml:"impact_map"`
+}
+
+// ImpactEntry maps code paths to the docs that must change with them.
+type ImpactEntry struct {
+	Paths []string `yaml:"paths"`
+	Docs  []string `yaml:"docs"`
 }
 
 // Problem is one reason quality.yaml is invalid.
