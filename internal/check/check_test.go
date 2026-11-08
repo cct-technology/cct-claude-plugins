@@ -175,11 +175,14 @@ func TestRunKeepsRegistryOrderAndCounts(t *testing.T) {
 }
 
 func waiverCtx(expires string) Context {
+	w := waivers.Waiver{Rule: "QK902", Paths: []string{"legacy/**"}, Reason: "being rewritten", Owner: "rk", Expires: expires}
 	return Context{
 		Today: time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC),
-		Waivers: waivers.Loaded{Present: true, Waivers: []waivers.Waiver{
-			{Rule: "QK902", Paths: []string{"legacy/**"}, Reason: "being rewritten", Owner: "rk", Expires: expires},
-		}},
+		Waivers: waivers.Loaded{
+			Present: true,
+			Waivers: []waivers.Waiver{w},
+			Log:     []waivers.LogEntry{waivers.NewLogEntry(w, waivers.Approval{By: "a person"})},
+		},
 	}
 }
 

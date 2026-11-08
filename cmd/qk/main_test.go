@@ -16,7 +16,7 @@ import (
 func runQK(t *testing.T, reg []check.Rule, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	code = run(reg, args, &out, &errOut)
+	code = run(reg, args, strings.NewReader(""), &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
@@ -310,8 +310,10 @@ func writeWaiver(t *testing.T, dir, content string) {
 
 func TestCheckAppliesAWaiver(t *testing.T) {
 	inRepo(t, "version: 1\nmaturity: silver\n")
-	dir, _ := os.Getwd()
-	writeWaiver(t, dir, "waivers:\n  - rule: QK010\n    paths: [\"*.go\"]\n    reason: being rewritten\n    owner: rk\n    expires: 2099-12-31\n")
+	if code, _, errOut := runQK(t, []check.Rule{failing}, "waiver", "add", "QK010", "--path", "*.go",
+		"--reason", "being rewritten", "--owner", "rk", "--expires", "2099-12-31", "--approved-by", "a person"); code != 0 {
+		t.Fatalf("waiver add: exit %d, stderr = %q", code, errOut)
+	}
 
 	code, out, _ := runQK(t, []check.Rule{failing}, "check")
 
@@ -319,6 +321,22 @@ func TestCheckAppliesAWaiver(t *testing.T) {
 		t.Errorf("exit code = %d, want 0 with the only finding waived", code)
 	}
 	if !strings.Contains(out, "PASS  QK010") || !strings.Contains(out, "waived: a.go: docs must change (rk until 2099-12-31: being rewritten)") {
+		t.Errorf("stdout = %q", out)
+	}
+}
+
+// A waiver written by hand, with no approval in the log, must not unblock anything.
+func TestCheckIgnoresAWaiverNobodyApproved(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	dir, _ := os.Getwd()
+	writeWaiver(t, dir, "waivers:\n  - rule: QK010\n    reason: wrote this myself\n    owner: rk\n    expires: 2099-12-31\n")
+
+	code, out, _ := runQK(t, append(rules.All(), failing), "check")
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(out, "FAIL  QK010") || !strings.Contains(out, "FAIL  QK100") || !strings.Contains(out, "no approval in .quality/exceptions-log.jsonl") {
 		t.Errorf("stdout = %q", out)
 	}
 }
@@ -347,7 +365,8 @@ func TestWaiverAddWritesAtTheRepoRootFromASubfolder(t *testing.T) {
 	t.Chdir(sub)
 
 	code, out, errOut := runQK(t, rules.All(), "waiver", "add", "qk001",
-		"--reason", "being fixed", "--owner", "rk", "--expires", "2099-12-31", "--path", "a/**", "--path", "b/**")
+		"--reason", "being fixed", "--owner", "rk", "--expires", "2099-12-31", "--path", "a/**", "--path", "b/**",
+		"--approved-by", "a person")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
@@ -362,13 +381,16 @@ func TestWaiverAddWritesAtTheRepoRootFromASubfolder(t *testing.T) {
 	if w := l.Waivers[0]; w.Rule != "QK001" || len(w.Paths) != 2 || w.Owner != "rk" || w.Expires != "2099-12-31" {
 		t.Errorf("waiver = %+v", w)
 	}
+	if len(l.Log) != 1 || l.Log[0].ApprovedBy != "a person" || l.Log[0].Identity != "Test <test@example.com>" {
+		t.Errorf("log = %+v", l.Log)
+	}
 	if _, err := os.Stat(filepath.Join(sub, ".quality")); err == nil {
 		t.Error("wrote .quality in the subfolder")
 	}
 }
 
 func TestWaiverAddUsageErrors(t *testing.T) {
-	good := []string{"--reason", "r", "--owner", "o", "--expires", "2099-12-31"}
+	good := []string{"--reason", "r", "--owner", "o", "--expires", "2099-12-31", "--approved-by", "a"}
 	tests := []struct {
 		name string
 		args []string
@@ -376,12 +398,14 @@ func TestWaiverAddUsageErrors(t *testing.T) {
 	}{
 		{"unknown rule", append([]string{"QK999"}, good...), "unknown rule QK999"},
 		{"QK100", append([]string{"QK100"}, good...), "QK100 cannot be waived"},
-		{"bad date", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "soon"}, "expires must be a date"},
-		{"past date", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "2000-01-01"}, "expired on 2000-01-01"},
-		{"missing reason", []string{"QK001", "--owner", "o", "--expires", "2099-12-31"}, "reason"},
-		{"missing owner", []string{"QK001", "--reason", "r", "--expires", "2099-12-31"}, "owner"},
-		{"missing expires", []string{"QK001", "--reason", "r", "--owner", "o"}, "expires"},
-		{"blank owner", []string{"QK001", "--reason", "r", "--owner", " ", "--expires", "2099-12-31"}, "no owner"},
+		{"bad date", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "soon", "--approved-by", "a"}, "expires must be a date"},
+		{"past date", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "2000-01-01", "--approved-by", "a"}, "expired on 2000-01-01"},
+		{"missing reason", []string{"QK001", "--owner", "o", "--expires", "2099-12-31", "--approved-by", "a"}, "reason"},
+		{"missing owner", []string{"QK001", "--reason", "r", "--expires", "2099-12-31", "--approved-by", "a"}, "owner"},
+		{"missing expires", []string{"QK001", "--reason", "r", "--owner", "o", "--approved-by", "a"}, "expires"},
+		{"blank owner", []string{"QK001", "--reason", "r", "--owner", " ", "--expires", "2099-12-31", "--approved-by", "a"}, "no owner"},
+		{"missing approver", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "2099-12-31"}, "approved-by"},
+		{"blank approver", []string{"QK001", "--reason", "r", "--owner", "o", "--expires", "2099-12-31", "--approved-by", " "}, "no approver"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -397,5 +421,39 @@ func TestWaiverAddUsageErrors(t *testing.T) {
 				t.Error("wrote a waiver despite the error")
 			}
 		})
+	}
+}
+
+func runHook(t *testing.T, stdin string) (code int, stdout, stderr string) {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	code = run(rules.All(), []string{"hook", "pre-tool-use"}, strings.NewReader(stdin), &out, &errOut)
+	return code, out.String(), errOut.String()
+}
+
+func TestHookAsksAPersonBeforeAWaiver(t *testing.T) {
+	code, out, _ := runHook(t, `{"tool_name":"Bash","tool_input":{"command":"qk waiver add QK010 --reason r"}}`)
+
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0", code)
+	}
+	if !strings.Contains(out, `"permissionDecision":"ask"`) || !strings.Contains(out, `"hookEventName":"PreToolUse"`) {
+		t.Errorf("stdout = %q", out)
+	}
+}
+
+func TestHookStaysQuietOnOrdinaryCommands(t *testing.T) {
+	code, out, errOut := runHook(t, `{"tool_name":"Bash","tool_input":{"command":"go test ./..."}}`)
+
+	if code != 0 || out != "" || errOut != "" {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want silence", code, out, errOut)
+	}
+}
+
+func TestHookFailsOpenOnBadInput(t *testing.T) {
+	code, out, errOut := runHook(t, "not json")
+
+	if code != 0 || out != "" || !strings.Contains(errOut, "warning") {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want exit 0 and a warning", code, out, errOut)
 	}
 }

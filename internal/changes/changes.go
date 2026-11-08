@@ -61,6 +61,17 @@ func Root(dir string) (string, error) {
 	return filepath.FromSlash(strings.TrimSpace(out)), nil
 }
 
+// Identity returns the git user at dir as "Name <email>", or "" when none is set.
+func Identity(dir string) string {
+	name, _ := git(dir, "config", "user.name")
+	email, _ := git(dir, "config", "user.email")
+	name, email = strings.TrimSpace(name), strings.TrimSpace(email)
+	if email == "" {
+		return name
+	}
+	return strings.TrimSpace(name + " <" + email + ">")
+}
+
 // Compute returns the change set for the repository at root. base is a ref
 // to compare against; empty means the default branch. Either way the base is
 // the merge-base with HEAD, as in a pull request.

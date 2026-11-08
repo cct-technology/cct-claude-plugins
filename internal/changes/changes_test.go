@@ -330,3 +330,21 @@ func TestContentAtBase(t *testing.T) {
 		t.Errorf("ContentAtBase(new.yaml) = ok %v, err %v; want not found", ok, err)
 	}
 }
+
+func TestIdentity(t *testing.T) {
+	dir := newRepo(t, "main")
+
+	if got := Identity(dir); got != "Test <test@example.com>" {
+		t.Errorf("Identity = %q", got)
+	}
+}
+
+func TestIdentityOutsideGitIsEmpty(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+
+	if got := Identity(dir); got != "" {
+		t.Errorf("Identity = %q, want empty", got)
+	}
+}

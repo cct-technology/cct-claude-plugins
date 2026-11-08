@@ -22,6 +22,6 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 - Phase: 1
 - Enforced by default at: silver, gold
 
-**What it checks.** A waiver in `.quality/waivers.yaml` needs a reason, an owner and an end date, so an exception cannot quietly become permanent. An expired or incomplete waiver never applies: the finding it covered is reported again. A waiver naming a rule this `qk` does not have is a warning, not a failure, because it hides nothing and may come from a newer `qk`. QK100 itself cannot be waived.
+**What it checks.** A waiver in `.quality/waivers.yaml` needs a reason, an owner and an end date, so an exception cannot quietly become permanent. It also needs a matching approval in `.quality/exceptions-log.jsonl`, written by `qk waiver add`, so a hand-written or later-edited waiver does not count. An expired, incomplete or unapproved waiver never applies: the finding it covered is reported again. A waiver naming a rule this `qk` does not have is a warning, not a failure, because it hides nothing and may come from a newer `qk`. QK100 itself cannot be waived.
 
-**How to fix.** Fix the finding and delete the waiver, or correct the field named here. To extend a waiver, give it a new date and a current reason.
+**How to fix.** Fix the finding and delete the waiver, or correct the field named here. To extend or change a waiver, have a person approve it again with `qk waiver add`.
