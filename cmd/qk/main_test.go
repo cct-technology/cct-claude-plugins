@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -183,5 +184,115 @@ func TestExplainUnknownRuleIsAUsageError(t *testing.T) {
 func TestUnknownCommandIsAUsageError(t *testing.T) {
 	if code, _, _ := runQK(t, nil, "bogus"); code != 2 {
 		t.Errorf("exit code = %d, want 2", code)
+	}
+}
+
+// gitRepo makes a fresh git repo on branch feature, cut from main, isolated
+// from the user's git config, and runs the test from it.
+func gitRepo(t *testing.T) string {
+	t.Helper()
+	empty := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(empty, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", empty)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "user.name", "Test"},
+		{"commit", "-q", "--allow-empty", "-m", "A"},
+		{"checkout", "-q", "-b", "feature"},
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	t.Chdir(dir)
+	return dir
+}
+
+// recorder is a rule that keeps the context it ran with.
+func recorder(got *check.Context) check.Rule {
+	r := testRule("QK901", "test.recorder", check.Result{Status: check.Pass})
+	r.Run = func(ctx check.Context) check.Result { *got = ctx; return check.Result{Status: check.Pass} }
+	return r
+}
+
+func TestCheckFindsManifestAtRepoRootFromSubfolder(t *testing.T) {
+	dir := gitRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "quality.yaml"), []byte("version: 1\nmaturity: platinum\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(dir, "internal", "pkg")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 1 || !strings.Contains(out, "FAIL  QK001") {
+		t.Errorf("exit code = %d, stdout = %q, want QK001 failing on the root quality.yaml", code, out)
+	}
+}
+
+func TestCheckGivesRulesTheChangeSet(t *testing.T) {
+	dir := gitRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "new.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var got check.Context
+
+	code, _, errOut := runQK(t, []check.Rule{recorder(&got)}, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
+	}
+	if got.ChangesErr != nil || got.Changes == nil || len(got.Changes.Files) != 1 || got.Changes.Files[0].Path != "new.txt" {
+		t.Errorf("context = %+v, want a change set with new.txt", got)
+	}
+	if got.ChangedOnly {
+		t.Error("ChangedOnly is set without --changed")
+	}
+}
+
+func TestCheckChangedFlag(t *testing.T) {
+	gitRepo(t)
+	var got check.Context
+
+	if code, _, errOut := runQK(t, []check.Rule{recorder(&got)}, "check", "--changed"); code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
+	}
+	if !got.ChangedOnly {
+		t.Error("--changed did not reach the rules")
+	}
+}
+
+// Outside a git repo there is no change set: rules that need one skip; qk does not fail.
+func TestCheckOutsideGitGivesRulesAReasonNotAnError(t *testing.T) {
+	inRepo(t, "")
+	dir, _ := os.Getwd()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+	var got check.Context
+
+	code, _, errOut := runQK(t, []check.Rule{recorder(&got)}, "check")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
+	}
+	if got.Changes != nil || got.ChangesErr == nil {
+		t.Errorf("context = %+v, want no change set and a reason", got)
+	}
+}
+
+func TestCheckBadBaseIsAUsageError(t *testing.T) {
+	gitRepo(t)
+
+	code, _, errOut := runQK(t, rules.All(), "check", "--base", "no-such-ref")
+
+	if code != 2 || !strings.Contains(errOut, "no-such-ref") {
+		t.Errorf("exit code = %d, stderr = %q, want 2 naming the ref", code, errOut)
 	}
 }
