@@ -1,6 +1,5 @@
-// Package changes answers "what changed on this branch?" for every rule:
-// the files changed between the base and the working tree, and the commit
-// trailers in between. It shells out to git.
+// Package changes answers "what changed on this branch?" for every rule: the
+// files changed between the base and the working tree. It shells out to git.
 package changes
 
 import (
@@ -29,19 +28,11 @@ type File struct {
 	Status  Status
 }
 
-// Trailer is one "Key: value" trailer of a commit in base..HEAD.
-type Trailer struct {
-	Commit string
-	Key    string
-	Value  string
-}
-
 // Set is what changed between the base and the working tree.
 type Set struct {
-	Root     string
-	Base     string // commit hash
-	Files    []File
-	Trailers []Trailer
+	Root  string
+	Base  string // commit hash
+	Files []File
 }
 
 // Reasons a change set cannot be computed. Rules that need one skip with the error as reason.
@@ -72,6 +63,15 @@ func Identity(dir string) string {
 	return strings.TrimSpace(name + " <" + email + ">")
 }
 
+// Branch returns the current branch name, or the short commit hash on a detached HEAD.
+func Branch(root string) string {
+	if out, err := git(root, "symbolic-ref", "--short", "--quiet", "HEAD"); err == nil {
+		return strings.TrimSpace(out)
+	}
+	out, _ := git(root, "rev-parse", "--short", "HEAD")
+	return strings.TrimSpace(out)
+}
+
 // Compute returns the change set for the repository at root. base is a ref
 // to compare against; empty means the default branch. Either way the base is
 // the merge-base with HEAD, as in a pull request.
@@ -97,9 +97,6 @@ func Compute(root, base string) (*Set, error) {
 	}
 	s := &Set{Root: root, Base: strings.TrimSpace(mb)}
 	if s.Files, err = changedFiles(root, s.Base); err != nil {
-		return nil, err
-	}
-	if s.Trailers, err = trailers(root, s.Base); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -167,30 +164,6 @@ func changedFiles(root, base string) ([]File, error) {
 		}
 	}
 	return files, nil
-}
-
-// trailers parses the trailers of every commit in base..HEAD, oldest first.
-func trailers(root, base string) ([]Trailer, error) {
-	out, err := git(root, "-c", "log.showSignature=false", "log", "--reverse", "--no-color", "-z",
-		"--format=%H%n%(trailers:only,unfold)", base+"..HEAD")
-	if err != nil {
-		return nil, err
-	}
-	var ts []Trailer
-	for _, entry := range strings.Split(out, "\x00") {
-		lines := strings.Split(strings.TrimSpace(entry), "\n")
-		if lines[0] == "" {
-			continue
-		}
-		for _, line := range lines[1:] {
-			key, value, ok := strings.Cut(line, ":")
-			if !ok {
-				continue
-			}
-			ts = append(ts, Trailer{Commit: lines[0], Key: strings.TrimSpace(key), Value: strings.TrimSpace(value)})
-		}
-	}
-	return ts, nil
 }
 
 // verify reports whether ref names a commit, by exit code only (git's messages may be localised).

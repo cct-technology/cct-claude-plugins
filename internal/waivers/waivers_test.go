@@ -342,3 +342,50 @@ func TestAddAppendsToTheLog(t *testing.T) {
 		t.Errorf("log = %+v", l.Log)
 	}
 }
+
+func TestLoadReadsTheLogWithoutAWaiversFile(t *testing.T) {
+	root := t.TempDir()
+	if err := AppendLog(root, NewNoteEntry(".quality/docs-impact/x.md", "r", approval)); err != nil {
+		t.Fatal(err)
+	}
+
+	l := Load(root)
+
+	if l.Present || len(l.Log) != 1 || !l.NoteApproved(".quality/docs-impact/x.md", "r") {
+		t.Errorf("Load = %+v", l)
+	}
+}
+
+func TestNoteApproved(t *testing.T) {
+	const p = ".quality/docs-impact/x.md"
+	w := Waiver{Rule: "QK010", Paths: []string{p}, Reason: "r", Owner: "o", Expires: "2099-01-01"}
+	tests := []struct {
+		name string
+		log  []LogEntry
+		want bool
+	}{
+		{"matching line", []LogEntry{NewNoteEntry(p, "r", approval)}, true},
+		{"no log", nil, false},
+		{"other note", []LogEntry{NewNoteEntry(".quality/docs-impact/y.md", "r", approval)}, false},
+		{"other reason", []LogEntry{NewNoteEntry(p, "s", approval)}, false},
+		{"no approver", []LogEntry{NewNoteEntry(p, "r", Approval{By: " "})}, false},
+		{"a waiver line does not approve a note", []LogEntry{NewLogEntry(w, approval)}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := (Loaded{Log: tt.log}).NoteApproved(p, "r"); got != tt.want {
+				t.Errorf("NoteApproved = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestANoteLineDoesNotApproveAWaiver(t *testing.T) {
+	w := Waiver{Rule: "QK010", Paths: []string{"a"}, Reason: "r", Owner: "o", Expires: "2099-01-01"}
+	e := NewNoteEntry("a", "r", approval)
+	e.Rule, e.Owner, e.Expires = w.Rule, w.Owner, w.Expires
+
+	if (Loaded{Log: []LogEntry{e}}).approved(w) {
+		t.Error("a docs-impact line approved a waiver")
+	}
+}

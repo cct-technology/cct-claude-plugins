@@ -111,7 +111,7 @@ feedback:
 | `qk context` | Short summary for session start: mode, maturity, open findings, active waivers expiring soon |
 | `qk explain <rule-id>` | What the rule checks, why, and how to fix |
 | `qk waiver add <rule-id> --reason --expires --owner --approved-by` | Writes `.quality/waivers.yaml` and appends the approval to `.quality/exceptions-log.jsonl` |
-| `qk docs-impact none --reason <reason>` | Writes `.quality/docs-impact/<branch>.md`: a "no docs needed" note that QK010 accepts before anything is committed |
+| `qk docs-impact none --reason <reason> --approved-by <person>` | Writes `.quality/docs-impact/<branch>.md`, a "no docs needed" note that QK010 accepts before anything is committed, and appends the approval to `.quality/exceptions-log.jsonl` |
 | `qk version` | Version + manifest schema version |
 
 ### Checks (rule IDs are stable; never reuse an ID)
@@ -119,7 +119,7 @@ feedback:
 | ID | Check | Phase |
 | --- | --- | --- |
 | QK001 | Manifest valid against schema | 1 |
-| QK010 | Docs impact: changed paths in `impact_map` require changes in mapped docs, or a waiver, or a `Docs-Impact: none — <reason>` commit trailer, or a docs-impact note (from `qk docs-impact`) in the change | 1 |
+| QK010 | Docs impact: changed paths in `impact_map` require changes in mapped docs, or a waiver, or an approved docs-impact note (from `qk docs-impact none`) in the change | 1 |
 | QK011 | Diátaxis structure present when `diataxis: true`; each doc has frontmatter `owner` and `review_by` | 2 |
 | QK012 | Docs past `review_by` | 2 |
 | QK013 | Broken internal links and missing images in docs | 2 |

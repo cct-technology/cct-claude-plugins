@@ -19,6 +19,7 @@ import (
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/docsimpact"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/hook"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
@@ -108,6 +109,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
 	root.AddCommand(checkCmd)
 	root.AddCommand(newWaiverCmd(reg))
+	root.AddCommand(newDocsImpactCmd())
 	root.AddCommand(newHookCmd())
 
 	root.AddCommand(&cobra.Command{
@@ -216,4 +218,48 @@ func newHookCmd() *cobra.Command {
 		},
 	})
 	return h
+}
+
+func newDocsImpactCmd() *cobra.Command {
+	var reason, approvedBy string
+	none := &cobra.Command{
+		Use:   "none",
+		Short: "Record a person's approval that this branch's change needs no docs",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			var problems []string
+			if strings.TrimSpace(reason) == "" {
+				problems = append(problems, "no reason")
+			}
+			if strings.TrimSpace(approvedBy) == "" {
+				problems = append(problems, "no approver")
+			}
+			if len(problems) > 0 {
+				return errors.New(strings.Join(problems, "; "))
+			}
+			cwd, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			root, err := changes.Root(cwd)
+			if err != nil {
+				return fmt.Errorf("a docs-impact note needs a git branch: %w", err)
+			}
+			approval := waivers.Approval{By: approvedBy, Identity: changes.Identity(root), Time: time.Now()}
+			path, err := docsimpact.Write(root, changes.Branch(root), reason, approval)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "No docs needed, approved by %s. Recorded in %s and %s\n", approvedBy, path, waivers.LogName)
+			return nil
+		},
+	}
+	none.Flags().StringVar(&reason, "reason", "", "why this change needs no docs (required)")
+	none.Flags().StringVar(&approvedBy, "approved-by", "", "the person who approved this (required)")
+	for _, f := range []string{"reason", "approved-by"} {
+		_ = none.MarkFlagRequired(f)
+	}
+	impact := &cobra.Command{Use: "docs-impact", Short: "Say what a change means for the docs"}
+	impact.AddCommand(none)
+	return impact
 }

@@ -27,7 +27,10 @@ const FileName = ".quality/waivers.yaml"
 // LogName is the committed, append-only record of approved exceptions.
 const LogName = ".quality/exceptions-log.jsonl"
 
-const actionWaiverAdd = "waiver.add"
+const (
+	actionWaiverAdd  = "waiver.add"
+	actionDocsImpact = "docs-impact.none"
+)
 
 // NeverWaived is the rule that checks the waivers themselves.
 const NeverWaived = "QK100"
@@ -68,8 +71,24 @@ type LogEntry struct {
 	Rule       string   `json:"rule"`
 	Paths      []string `json:"paths,omitempty"`
 	Reason     string   `json:"reason"`
-	Owner      string   `json:"owner"`
-	Expires    string   `json:"expires"`
+	Owner      string   `json:"owner,omitempty"`
+	Expires    string   `json:"expires,omitempty"`
+}
+
+// NewNoteEntry records that a approved the docs-impact note at path.
+func NewNoteEntry(path, reason string, a Approval) LogEntry {
+	return LogEntry{
+		Time: a.Time.UTC().Format(time.RFC3339), Action: actionDocsImpact,
+		Identity: a.Identity, ApprovedBy: a.By, Paths: []string{path}, Reason: reason,
+	}
+}
+
+// NoteApproved reports whether a person approved the note at path with this reason.
+func (l Loaded) NoteApproved(path, reason string) bool {
+	return slices.ContainsFunc(l.Log, func(e LogEntry) bool {
+		return e.Action == actionDocsImpact && strings.TrimSpace(e.ApprovedBy) != "" &&
+			e.Reason == reason && slices.Equal(e.Paths, []string{path})
+	})
 }
 
 // NewLogEntry records that a approved w.
@@ -83,9 +102,13 @@ func NewLogEntry(w Waiver, a Approval) LogEntry {
 
 // Load reads the waivers file under root.
 func Load(root string) Loaded {
+	log, logProblems, err := readLog(root)
+	if err != nil {
+		return Loaded{Present: true, Err: err}
+	}
 	data, err := os.ReadFile(path(root))
 	if errors.Is(err, fs.ErrNotExist) {
-		return Loaded{}
+		return Loaded{Log: log, Problems: logProblems} // the log also holds docs-impact approvals
 	}
 	if err != nil {
 		return Loaded{Present: true, Err: err}
@@ -96,13 +119,9 @@ func Load(root string) Loaded {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&file); err != nil && !errors.Is(err, io.EOF) {
-		return Loaded{Present: true, Problems: []string{err.Error()}}
+		return Loaded{Present: true, Problems: []string{err.Error()}, Log: log}
 	}
-	log, problems, err := readLog(root)
-	if err != nil {
-		return Loaded{Present: true, Err: err}
-	}
-	return Loaded{Present: true, Waivers: file.Waivers, Log: log, Problems: problems}
+	return Loaded{Present: true, Waivers: file.Waivers, Log: log, Problems: logProblems}
 }
 
 func readLog(root string) ([]LogEntry, []string, error) {
@@ -249,18 +268,19 @@ func Add(root string, w Waiver, a Approval) error {
 	if err := enc.Close(); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path(root)), 0o755); err != nil {
-		return err
-	}
 	// The log goes first: a stray log line grants nothing, while a waiver
 	// written without its line simply does not apply.
-	if err := appendLog(root, NewLogEntry(w, a)); err != nil {
+	if err := AppendLog(root, NewLogEntry(w, a)); err != nil {
 		return err
 	}
 	return os.WriteFile(path(root), out.Bytes(), 0o644)
 }
 
-func appendLog(root string, e LogEntry) error {
+// AppendLog adds one line to the exceptions log under root.
+func AppendLog(root string, e LogEntry) error {
+	if err := os.MkdirAll(filepath.Dir(logPath(root)), 0o755); err != nil {
+		return err
+	}
 	var line bytes.Buffer
 	enc := json.NewEncoder(&line) // Encode ends the line
 	enc.SetEscapeHTML(false)      // people read this file: keep <email> as written

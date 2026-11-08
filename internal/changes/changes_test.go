@@ -287,27 +287,6 @@ func TestUncommittedAndUntrackedWorkCounts(t *testing.T) {
 	}
 }
 
-func TestTrailersComeOnlyFromCommitsAfterTheBase(t *testing.T) {
-	dir := newRepo(t, "main")
-	write(t, dir, "a.txt", "1")
-	commit(t, dir, "A\n\nDocs-Impact: none — before the base")
-	run(t, dir, "checkout", "-q", "-b", "feature")
-	write(t, dir, "a.txt", "2")
-	c := commit(t, dir, "refactor: move code\n\nBody text.\n\nDocs-Impact: none — internal refactor\nRefs: CCT-1")
-
-	s, err := Compute(dir, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []Trailer{
-		{Commit: c, Key: "Docs-Impact", Value: "none — internal refactor"},
-		{Commit: c, Key: "Refs", Value: "CCT-1"},
-	}
-	if !reflect.DeepEqual(s.Trailers, want) {
-		t.Errorf("trailers = %+v, want %+v", s.Trailers, want)
-	}
-}
-
 func TestContentAtBase(t *testing.T) {
 	dir := newRepo(t, "main")
 	write(t, dir, "api/openapi.yaml", "openapi: 3.1.0\n")
@@ -346,5 +325,21 @@ func TestIdentityOutsideGitIsEmpty(t *testing.T) {
 
 	if got := Identity(dir); got != "" {
 		t.Errorf("Identity = %q, want empty", got)
+	}
+}
+
+func TestBranch(t *testing.T) {
+	dir := newRepo(t, "main")
+	write(t, dir, "a.txt", "1")
+	c := commit(t, dir, "A")
+	run(t, dir, "checkout", "-q", "-b", "rk/feature")
+
+	if got := Branch(dir); got != "rk/feature" {
+		t.Errorf("Branch = %q", got)
+	}
+
+	run(t, dir, "checkout", "-q", "--detach")
+	if got := Branch(dir); got == "" || !strings.HasPrefix(c, got) {
+		t.Errorf("detached Branch = %q, want a short form of %s", got, c)
 	}
 }

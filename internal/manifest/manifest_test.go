@@ -35,6 +35,13 @@ func TestLoadValidManifestUsingEveryKey(t *testing.T) {
 	if !reflect.DeepEqual(l.Manifest.Modes, want) {
 		t.Errorf("modes = %v, want %v", l.Manifest.Modes, want)
 	}
+	wantMap := []ImpactEntry{
+		{Paths: []string{"internal/config/**"}, Docs: []string{"docs/reference/settings.md"}},
+		{Paths: []string{"web/app/(admin)/**"}, Docs: []string{"docs/how-to/admin/**"}},
+	}
+	if !reflect.DeepEqual(l.Manifest.Docs.ImpactMap, wantMap) {
+		t.Errorf("impact map = %+v, want %+v", l.Manifest.Docs.ImpactMap, wantMap)
+	}
 }
 
 func TestLoadMinimalManifest(t *testing.T) {
