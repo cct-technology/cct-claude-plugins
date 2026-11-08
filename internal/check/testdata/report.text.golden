@@ -6,7 +6,9 @@ WARN  QK110  CODEOWNERS covers every top-level path (advisory)
       - scripts: no owner
       fix: Add a CODEOWNERS line for the path.
 PASS  QK001  Manifest is valid (enforced)
+PASS  QK020  Generated files are current (enforced)
+      waived: docs/reference/settings.md: differs from generator output (rk until 2026-12-31: generator moves in CCT-1)
 SKIP  QK030  No breaking OpenAPI changes (enforced)
       skipped: oasdiff not installed
 
-1 fail, 1 warn, 1 pass, 1 skipped (blocking)
+1 fail, 1 warn, 2 pass, 1 skipped, 1 waived (blocking)

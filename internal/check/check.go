@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
 )
 
 // Status is what a rule reports.
@@ -65,6 +67,8 @@ type Context struct {
 	Changes     *changes.Set    // what changed against the base; nil when ChangesErr is set
 	ChangesErr  error           // why there is no change set: rules that need one skip with it as reason
 	ChangedOnly bool            // --changed: checks that scan the whole repo look only at changed files
+	Waivers     waivers.Loaded  // .quality/waivers.yaml, if any
+	Today       time.Time       // the day waivers are judged against
 }
 
 // Rule is one registered check. IDs are stable and never reused.
@@ -125,14 +129,24 @@ func (c Config) ModeFor(r Rule) Mode {
 // RuleResult is one rule's outcome after its mode is applied.
 // The JSON shape is a contract read by hooks, SARIF and CI: add fields, never rename.
 type RuleResult struct {
-	Rule     string    `json:"rule"`
-	Check    string    `json:"check"`
-	Title    string    `json:"title"`
-	Mode     Mode      `json:"mode"`
-	Status   Status    `json:"status"`
-	Reason   string    `json:"reason,omitempty"`
-	Findings []Finding `json:"findings,omitempty"`
-	Fix      string    `json:"fix,omitempty"`
+	Rule     string          `json:"rule"`
+	Check    string          `json:"check"`
+	Title    string          `json:"title"`
+	Mode     Mode            `json:"mode"`
+	Status   Status          `json:"status"`
+	Reason   string          `json:"reason,omitempty"`
+	Findings []Finding       `json:"findings,omitempty"`
+	Waived   []WaivedFinding `json:"waived,omitempty"`
+	Fix      string          `json:"fix,omitempty"`
+}
+
+// WaivedFinding is a finding covered by a valid waiver.
+type WaivedFinding struct {
+	File    string `json:"file,omitempty"`
+	Message string `json:"message"`
+	Owner   string `json:"owner"`
+	Expires string `json:"expires"`
+	Reason  string `json:"reason"`
 }
 
 // Summary counts rule results by status.
@@ -141,6 +155,7 @@ type Summary struct {
 	Warn    int `json:"warn"`
 	Fail    int `json:"fail"`
 	Skipped int `json:"skipped"`
+	Waived  int `json:"waived"` // findings, not rules
 }
 
 // Report is the outcome of a check run.
@@ -164,9 +179,14 @@ func Run(rules []Rule, cfg Config, ctx Context) Report {
 		}
 		rr := RuleResult{
 			Rule: r.ID, Check: r.Check, Title: r.Title, Mode: mode,
-			Status: res.Status, Reason: res.Reason, Findings: res.Findings,
+			Status: res.Status, Reason: res.Reason,
 		}
-		switch res.Status {
+		rr.Findings, rr.Waived = applyWaivers(r.ID, res.Findings, ctx)
+		if len(rr.Waived) > 0 && len(rr.Findings) == 0 {
+			rr.Status = Pass // everything this rule found is covered
+		}
+		rep.Summary.Waived += len(rr.Waived)
+		switch rr.Status {
 		case Pass:
 			rep.Summary.Pass++
 		case Warn:
@@ -182,6 +202,19 @@ func Run(rules []Rule, cfg Config, ctx Context) Report {
 		rep.Results = append(rep.Results, rr)
 	}
 	return rep
+}
+
+// applyWaivers splits findings into those still open and those a valid waiver covers.
+func applyWaivers(rule string, findings []Finding, ctx Context) (open []Finding, waived []WaivedFinding) {
+	for _, f := range findings {
+		w := ctx.Waivers.Find(rule, f.File, ctx.Today)
+		if w == nil {
+			open = append(open, f)
+			continue
+		}
+		waived = append(waived, WaivedFinding{File: f.File, Message: f.Message, Owner: w.Owner, Expires: w.Expires, Reason: w.Reason})
+	}
+	return open, waived
 }
 
 // runSafely turns a crashing rule into a skip: tooling problems fail open.

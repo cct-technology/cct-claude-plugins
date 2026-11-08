@@ -31,11 +31,19 @@ var sample = Report{
 		},
 		{Rule: "QK001", Check: "manifest.valid", Title: "Manifest is valid", Mode: Enforced, Status: Pass},
 		{
+			Rule: "QK020", Check: "generated.current", Title: "Generated files are current",
+			Mode: Enforced, Status: Pass,
+			Waived: []WaivedFinding{{
+				File: "docs/reference/settings.md", Message: "differs from generator output",
+				Owner: "rk", Expires: "2026-12-31", Reason: "generator moves in CCT-1",
+			}},
+		},
+		{
 			Rule: "QK030", Check: "contracts.breaking", Title: "No breaking OpenAPI changes",
 			Mode: Enforced, Status: Skipped, Reason: "oasdiff not installed",
 		},
 	},
-	Summary:  Summary{Pass: 1, Warn: 1, Fail: 1, Skipped: 1},
+	Summary:  Summary{Pass: 2, Warn: 1, Fail: 1, Skipped: 1, Waived: 1},
 	Blocking: true,
 }
 

@@ -1,0 +1,5 @@
+waivers:
+  - rule: QK010
+    reason: Not a date
+    owner: rkvalvaa
+    expires: next spring

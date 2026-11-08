@@ -5,8 +5,10 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
 )
 
 func rule(id, key string, from Maturity, res Result) Rule {
@@ -169,6 +171,76 @@ func TestRunKeepsRegistryOrderAndCounts(t *testing.T) {
 	}
 	if rep.Summary != (Summary{Pass: 1, Fail: 1, Skipped: 1}) {
 		t.Errorf("summary = %+v", rep.Summary)
+	}
+}
+
+func waiverCtx(expires string) Context {
+	return Context{
+		Today: time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC),
+		Waivers: waivers.Loaded{Present: true, Waivers: []waivers.Waiver{
+			{Rule: "QK902", Paths: []string{"legacy/**"}, Reason: "being rewritten", Owner: "rk", Expires: expires},
+		}},
+	}
+}
+
+func TestRunEveryFindingWaivedPassesAndDoesNotBlock(t *testing.T) {
+	r := rule("QK902", "docs.impact", Silver, Result{Status: Fail, Findings: []Finding{{File: "legacy/a.go", Message: "m"}}})
+
+	rep := Run([]Rule{r}, Config{Maturity: Silver}, waiverCtx("2099-01-01"))
+
+	got := rep.Results[0]
+	if got.Status != Pass || len(got.Findings) != 0 || got.Fix != "" {
+		t.Errorf("result = %+v, want pass with no open findings and no fix", got)
+	}
+	want := []WaivedFinding{{File: "legacy/a.go", Message: "m", Owner: "rk", Expires: "2099-01-01", Reason: "being rewritten"}}
+	if !reflect.DeepEqual(got.Waived, want) {
+		t.Errorf("waived = %+v, want %+v", got.Waived, want)
+	}
+	if rep.Blocking {
+		t.Error("a fully waived rule must not block")
+	}
+	if rep.Summary != (Summary{Pass: 1, Waived: 1}) {
+		t.Errorf("summary = %+v", rep.Summary)
+	}
+}
+
+func TestRunPartlyWaivedRuleStillBlocks(t *testing.T) {
+	r := rule("QK902", "docs.impact", Silver, Result{Status: Fail, Findings: []Finding{
+		{File: "legacy/a.go", Message: "waived one"},
+		{File: "new/b.go", Message: "open one"},
+	}})
+
+	rep := Run([]Rule{r}, Config{Maturity: Silver}, waiverCtx("2099-01-01"))
+
+	got := rep.Results[0]
+	if got.Status != Fail || len(got.Findings) != 1 || got.Findings[0].File != "new/b.go" || len(got.Waived) != 1 {
+		t.Errorf("result = %+v", got)
+	}
+	if !rep.Blocking || got.Fix != "fix" {
+		t.Errorf("blocking = %v, fix = %q", rep.Blocking, got.Fix)
+	}
+	if rep.Summary != (Summary{Fail: 1, Waived: 1}) {
+		t.Errorf("summary = %+v", rep.Summary)
+	}
+}
+
+func TestRunAdvisoryWarningCanBeWaived(t *testing.T) {
+	r := rule("QK902", "docs.impact", Silver, Result{Status: Fail, Findings: []Finding{{File: "legacy/a.go", Message: "m"}}})
+
+	rep := Run([]Rule{r}, Config{}, waiverCtx("2099-01-01"))
+
+	if got := rep.Results[0]; got.Status != Pass || len(got.Waived) != 1 {
+		t.Errorf("result = %+v", got)
+	}
+}
+
+func TestRunExpiredWaiverDoesNotApply(t *testing.T) {
+	r := rule("QK902", "docs.impact", Silver, Result{Status: Fail, Findings: []Finding{{File: "legacy/a.go", Message: "m"}}})
+
+	rep := Run([]Rule{r}, Config{Maturity: Silver}, waiverCtx("2026-11-07"))
+
+	if got := rep.Results[0]; got.Status != Fail || len(got.Waived) != 0 || !rep.Blocking {
+		t.Errorf("result = %+v, blocking = %v", got, rep.Blocking)
 	}
 }
 

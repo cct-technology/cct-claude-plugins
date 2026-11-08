@@ -15,3 +15,13 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 **What it checks.** `quality.yaml` matches the manifest schema, so every other check reads what the repo meant. An unknown key or a mistyped mode would otherwise be ignored or misread. A key under `modes` that names no known check is reported as a warning, not a failure, so a manifest written for a newer `qk` does not block an older one.
 
 **How to fix.** Correct the key or value named in the finding. Every allowed key and value is listed in `docs/reference/manifest.md`.
+
+## QK100 — Waivers are valid, owned and not expired
+
+- Check key: `waivers.valid`
+- Phase: 1
+- Enforced by default at: silver, gold
+
+**What it checks.** A waiver in `.quality/waivers.yaml` needs a reason, an owner and an end date, so an exception cannot quietly become permanent. An expired or incomplete waiver never applies: the finding it covered is reported again. A waiver naming a rule this `qk` does not have is a warning, not a failure, because it hides nothing and may come from a newer `qk`. QK100 itself cannot be waived.
+
+**How to fix.** Fix the finding and delete the waiver, or correct the field named here. To extend a waiver, give it a new date and a current reason.

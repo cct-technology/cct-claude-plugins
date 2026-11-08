@@ -6,4 +6,5 @@ Fix: Update the mapped docs, or add a `Docs-Impact: none — <reason>` commit tr
 QK110 warn: CODEOWNERS covers every top-level path
 - scripts: no owner
 Fix: Add a CODEOWNERS line for the path. More: qk explain QK110
+Waived: QK020 docs/reference/settings.md (until 2026-12-31)
 Skipped: QK030 (oasdiff not installed)

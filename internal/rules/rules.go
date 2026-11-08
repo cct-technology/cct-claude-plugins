@@ -10,5 +10,6 @@ import "github.com/rkvalvaa/cct-claude-plugins/internal/check"
 func All() []check.Rule {
 	return []check.Rule{
 		qk001(),
+		qk100(),
 	}
 }

@@ -4,6 +4,8 @@
 
 ### Added
 
+- Waivers in `.quality/waivers.yaml`: `qk waiver add <rule-id> --reason --owner --expires [--path]` records an agreed, owned, time-limited exception. A waived finding no longer blocks and is listed as waived in every output format; a rule with only waived findings reports `pass`. The JSON report gains `waived` on rule results and in the summary.
+- QK100 (`waivers.valid`): every waiver has a reason, an owner and a valid end date, and has not expired. An expired or incomplete waiver never applies. A waiver for a rule this `qk` does not have is a warning. QK100 cannot be waived.
 - `qk check` finds the repository root from any subfolder and computes what changed: files changed between the merge-base with the default branch (`origin/HEAD`, then `main`, then `master`) and the working tree, including uncommitted and untracked files, plus commit trailers such as `Docs-Impact`. Outside git, checks that need this are skipped with the reason.
 - `qk check --base <ref>` compares against the merge-base with another ref; a ref that names no commit exits 2. `qk check --changed` limits whole-repo checks to changed files.
 - `quality.yaml` manifest, version 1, validated against `plugins/quality-kit/schemas/quality.schema.json`. `maturity` and `modes` now set each check's mode; with no manifest, every check stays advisory. An invalid manifest is treated as bronze, so QK001 blocks.

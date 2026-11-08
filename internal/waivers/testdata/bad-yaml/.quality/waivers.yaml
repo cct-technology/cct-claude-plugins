@@ -1,0 +1,3 @@
+waivers:
+  - rule: QK010
+   reason: bad indent
