@@ -1,0 +1,21 @@
+# Quality Kit checks itself. See docs/reference/manifest.md for every key.
+version: 1
+service: quality-kit
+owners: { product: rkvalvaa, tech: rkvalvaa }
+data_class: internal
+maturity: silver
+docs:
+  root: docs
+  impact_map:
+    # Rule and CLI behaviour. Test files are left out on purpose: qk???.go does not match qk010_test.go.
+    - paths: ["internal/rules/qk???.go", "cmd/qk/main.go"]
+      docs: ["docs/reference/**", "docs/how-to/**"]
+    - paths: ["plugins/quality-kit/schemas/**"]
+      docs: ["docs/reference/manifest.md"]
+    - paths: ["plugins/quality-kit/skills/**", "plugins/quality-kit/hooks/**"]
+      docs: ["docs/how-to/**"]
+generated:
+  - file: docs/reference/rules.md
+    cmd: go run ./cmd/gen-docs
+  - file: docs/reference/manifest.md
+    cmd: go run ./cmd/gen-docs
