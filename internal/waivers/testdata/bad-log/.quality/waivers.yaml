@@ -1,0 +1,5 @@
+waivers:
+  - rule: QK010
+    reason: r
+    owner: o
+    expires: 2099-12-31

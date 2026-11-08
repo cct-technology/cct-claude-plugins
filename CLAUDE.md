@@ -8,6 +8,7 @@ This repo (`cct-claude-plugins`) is a Claude Code plugin marketplace. Its first 
 - The plugin must work standalone in any repo with zero configuration. Never add a dependency on other CCT repos or services.
 - `qk` (Go CLI) decides pass/fail. Skills never decide pass/fail and never invent reference facts.
 - Hooks fail open: tooling errors warn and exit 0. Only real findings block, and only in `enforced` mode.
+- Exceptions need a person: waivers and docs-impact notes are approved by a human and logged, and changes to `quality.yaml` need a human's approval. Claude never grants one for itself.
 - Before writing or changing `plugin.json`, `marketplace.json`, `hooks/hooks.json` or any `SKILL.md`, check the current official Claude Code docs (plugins reference, hooks reference, skills), via the `claude-code-guide` agent when available. The docs win over this file and the spec.
 - Verification runs in a fresh context: the `quality-reviewer` agent and verification skills are read-only subagents, never the session that wrote the code.
 - SPEC §11 lists open decisions (dependency age threshold, licence allowlist, Linear auto-filing of mitigations). Ask the user before settling any of them in code.

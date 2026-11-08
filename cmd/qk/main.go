@@ -6,6 +6,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/hook"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
@@ -30,12 +32,13 @@ var version = "dev"
 var errBlocking = errors.New("blocking findings")
 
 func main() {
-	os.Exit(run(rules.All(), os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(run(rules.All(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-func run(reg []check.Rule, args []string, stdout, stderr io.Writer) int {
+func run(reg []check.Rule, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	root := newRootCmd(reg)
 	root.SetArgs(args)
+	root.SetIn(stdin)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	err := root.Execute()
@@ -105,6 +108,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
 	root.AddCommand(checkCmd)
 	root.AddCommand(newWaiverCmd(reg))
+	root.AddCommand(newHookCmd())
 
 	root.AddCommand(&cobra.Command{
 		Use:   "explain <rule-id>",
@@ -136,7 +140,10 @@ func repoRoot() (string, error) {
 }
 
 func newWaiverCmd(reg []check.Rule) *cobra.Command {
-	var w waivers.Waiver
+	var (
+		w          waivers.Waiver
+		approvedBy string
+	)
 	add := &cobra.Command{
 		Use:   "add <rule-id>",
 		Short: "Record an agreed, owned, time-limited exception to a rule",
@@ -150,17 +157,24 @@ func newWaiverCmd(reg []check.Rule) *cobra.Command {
 			if !known {
 				return fmt.Errorf("unknown rule %s", w.Rule)
 			}
-			if problems := w.Problems(time.Now()); len(problems) > 0 {
+			now := time.Now()
+			problems := w.Problems(now)
+			if strings.TrimSpace(approvedBy) == "" {
+				problems = append(problems, "no approver")
+			}
+			if len(problems) > 0 {
 				return errors.New(strings.Join(problems, "; "))
 			}
 			root, err := repoRoot()
 			if err != nil {
 				return err
 			}
-			if err := waivers.Add(root, w); err != nil {
+			approval := waivers.Approval{By: approvedBy, Identity: changes.Identity(root), Time: now}
+			if err := waivers.Add(root, w, approval); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Waived %s until %s in %s\n", w.Rule, w.Expires, waivers.FileName)
+			fmt.Fprintf(cmd.OutOrStdout(), "Waived %s until %s, approved by %s. Recorded in %s and %s\n",
+				w.Rule, w.Expires, approvedBy, waivers.FileName, waivers.LogName)
 			return nil
 		},
 	}
@@ -168,11 +182,38 @@ func newWaiverCmd(reg []check.Rule) *cobra.Command {
 	add.Flags().StringVar(&w.Owner, "owner", "", "who answers for this exception (required)")
 	add.Flags().StringVar(&w.Expires, "expires", "", "last day the waiver applies, YYYY-MM-DD (required)")
 	add.Flags().StringArrayVar(&w.Paths, "path", nil, "glob of files the waiver covers; repeatable (default: every finding of the rule)")
-	for _, f := range []string{"reason", "owner", "expires"} {
+	add.Flags().StringVar(&approvedBy, "approved-by", "", "the person who approved this exception (required)")
+	for _, f := range []string{"reason", "owner", "expires", "approved-by"} {
 		_ = add.MarkFlagRequired(f)
 	}
 
 	waiver := &cobra.Command{Use: "waiver", Short: "Manage waivers in " + waivers.FileName}
 	waiver.AddCommand(add)
 	return waiver
+}
+
+func newHookCmd() *cobra.Command {
+	h := &cobra.Command{Use: "hook", Short: "Entry points for Claude Code hooks", Hidden: true}
+	h.AddCommand(&cobra.Command{
+		Use:   "pre-tool-use",
+		Short: "Decide a PreToolUse hook from its JSON on stdin",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			input, err := io.ReadAll(cmd.InOrStdin())
+			if err != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), "qk: warning:", err)
+				return nil // hooks fail open
+			}
+			out, err := hook.PreToolUse(input)
+			if err != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), "qk: warning:", err)
+				return nil
+			}
+			if out == nil {
+				return nil
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(out)
+		},
+	})
+	return h
 }

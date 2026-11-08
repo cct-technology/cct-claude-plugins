@@ -46,6 +46,19 @@ func TestQK100SkipsAnUnreadableFile(t *testing.T) {
 	}
 }
 
+func TestQK100FailsAWaiverNobodyApproved(t *testing.T) {
+	res := runRegisteredQK100(t, waivers.Loaded{Present: true, Waivers: []waivers.Waiver{
+		{Rule: "QK001", Reason: "hand-written", Owner: "o", Expires: "2099-01-01"},
+	}})
+
+	if res.Status != check.Fail || len(res.Findings) != 1 {
+		t.Fatalf("result = %+v", res)
+	}
+	if msg := res.Findings[0].Message; !strings.Contains(msg, "waivers[0] (QK001): no approval in .quality/exceptions-log.jsonl") {
+		t.Errorf("message = %q", msg)
+	}
+}
+
 func TestQK100PassesValidWaivers(t *testing.T) {
 	// The fixture waives QK010 and QK110, which this registry may not hold yet:
 	// those are warnings at most, never failures.
@@ -65,6 +78,7 @@ func TestQK100Fails(t *testing.T) {
 		{"waives-qk100", "waivers[0] (QK100): QK100 cannot be waived"},
 		{"bad-yaml", "did not find expected"},
 		{"unknown-key", "reson"},
+		{"bad-log", "exceptions-log.jsonl line 1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.fixture, func(t *testing.T) {
@@ -94,10 +108,16 @@ func TestQK100WarnsOnUnknownRule(t *testing.T) {
 }
 
 func TestQK100FailureOutranksUnknownRuleWarning(t *testing.T) {
-	res := runRegisteredQK100(t, waivers.Loaded{Present: true, Waivers: []waivers.Waiver{
-		{Rule: "QK999", Reason: "r", Owner: "o", Expires: "2099-01-01"},
-		{Rule: "QK001", Reason: "r", Owner: "", Expires: "2099-01-01"},
-	}})
+	unknown := waivers.Waiver{Rule: "QK999", Reason: "r", Owner: "o", Expires: "2099-01-01"}
+	noOwner := waivers.Waiver{Rule: "QK001", Reason: "r", Owner: "", Expires: "2099-01-01"}
+	res := runRegisteredQK100(t, waivers.Loaded{
+		Present: true,
+		Waivers: []waivers.Waiver{unknown, noOwner},
+		Log: []waivers.LogEntry{
+			waivers.NewLogEntry(unknown, waivers.Approval{By: "a person"}),
+			waivers.NewLogEntry(noOwner, waivers.Approval{By: "a person"}),
+		},
+	})
 
 	if res.Status != check.Fail || len(res.Findings) != 2 {
 		t.Errorf("result = %+v, want fail with both findings", res)

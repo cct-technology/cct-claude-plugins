@@ -3,13 +3,16 @@
 package waivers
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,6 +23,11 @@ import (
 
 // FileName is the waivers file, relative to the repo root.
 const FileName = ".quality/waivers.yaml"
+
+// LogName is the committed, append-only record of approved exceptions.
+const LogName = ".quality/exceptions-log.jsonl"
+
+const actionWaiverAdd = "waiver.add"
 
 // NeverWaived is the rule that checks the waivers themselves.
 const NeverWaived = "QK100"
@@ -40,7 +48,37 @@ type Loaded struct {
 	Present  bool     // the file exists
 	Err      error    // the file exists but could not be read: a tooling problem
 	Waivers  []Waiver // empty when the file cannot be parsed
-	Problems []string // why the file cannot be parsed
+	Problems []string // why the file or the log cannot be parsed
+	Log      []LogEntry
+}
+
+// Approval says who approved an exception and when.
+type Approval struct {
+	By       string // the person who approved it
+	Identity string // git identity of whoever recorded it
+	Time     time.Time
+}
+
+// LogEntry is one line of the log. A waiver counts only with a matching entry.
+type LogEntry struct {
+	Time       string   `json:"time"`
+	Action     string   `json:"action"`
+	Identity   string   `json:"identity,omitempty"`
+	ApprovedBy string   `json:"approved_by"`
+	Rule       string   `json:"rule"`
+	Paths      []string `json:"paths,omitempty"`
+	Reason     string   `json:"reason"`
+	Owner      string   `json:"owner"`
+	Expires    string   `json:"expires"`
+}
+
+// NewLogEntry records that a approved w.
+func NewLogEntry(w Waiver, a Approval) LogEntry {
+	return LogEntry{
+		Time: a.Time.UTC().Format(time.RFC3339), Action: actionWaiverAdd,
+		Identity: a.Identity, ApprovedBy: a.By,
+		Rule: w.Rule, Paths: w.Paths, Reason: w.Reason, Owner: w.Owner, Expires: w.Expires,
+	}
 }
 
 // Load reads the waivers file under root.
@@ -60,7 +98,37 @@ func Load(root string) Loaded {
 	if err := dec.Decode(&file); err != nil && !errors.Is(err, io.EOF) {
 		return Loaded{Present: true, Problems: []string{err.Error()}}
 	}
-	return Loaded{Present: true, Waivers: file.Waivers}
+	log, problems, err := readLog(root)
+	if err != nil {
+		return Loaded{Present: true, Err: err}
+	}
+	return Loaded{Present: true, Waivers: file.Waivers, Log: log, Problems: problems}
+}
+
+func readLog(root string) ([]LogEntry, []string, error) {
+	data, err := os.ReadFile(logPath(root))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	var log []LogEntry
+	var problems []string
+	lines := bufio.NewScanner(bytes.NewReader(data))
+	lines.Buffer(nil, 1<<20)
+	for n := 1; lines.Scan(); n++ {
+		if strings.TrimSpace(lines.Text()) == "" {
+			continue
+		}
+		var e LogEntry
+		if err := json.Unmarshal(lines.Bytes(), &e); err != nil {
+			problems = append(problems, fmt.Sprintf("%s line %d: %v", LogName, n, err))
+			continue
+		}
+		log = append(log, e)
+	}
+	return log, problems, lines.Err()
 }
 
 // Problems says why w is invalid on the given day. A waiver with problems never applies.
@@ -86,10 +154,29 @@ func (w Waiver) Problems(today time.Time) []string {
 	return out
 }
 
+// ProblemsOf says why w does not apply: its own problems, or no recorded approval.
+func (l Loaded) ProblemsOf(w Waiver, today time.Time) []string {
+	out := w.Problems(today)
+	if !l.approved(w) {
+		out = append(out, "no approval in "+LogName+"; record it with qk waiver add")
+	}
+	return out
+}
+
+// approved requires an entry matching every field, so editing a waiver after
+// approval (a later date, wider paths) voids it.
+func (l Loaded) approved(w Waiver) bool {
+	return slices.ContainsFunc(l.Log, func(e LogEntry) bool {
+		return e.Action == actionWaiverAdd && strings.TrimSpace(e.ApprovedBy) != "" &&
+			e.Rule == w.Rule && e.Reason == w.Reason && e.Owner == w.Owner && e.Expires == w.Expires &&
+			slices.Equal(e.Paths, w.Paths)
+	})
+}
+
 // Find returns the waiver covering a finding of rule on file, or nil.
 func (l Loaded) Find(rule, file string, today time.Time) *Waiver {
 	for i, w := range l.Waivers {
-		if w.Rule == rule && len(w.Problems(today)) == 0 && w.covers(file) {
+		if w.Rule == rule && len(l.ProblemsOf(w, today)) == 0 && w.covers(file) {
 			return &l.Waivers[i]
 		}
 	}
@@ -116,16 +203,16 @@ func (l Loaded) ExpiringWithin(days int, today time.Time) []Waiver {
 	last := today.AddDate(0, 0, days).Format(dateLayout)
 	var out []Waiver
 	for _, w := range l.Waivers {
-		if len(w.Problems(today)) == 0 && w.Expires <= last {
+		if len(l.ProblemsOf(w, today)) == 0 && w.Expires <= last {
 			out = append(out, w)
 		}
 	}
 	return out
 }
 
-// Add appends w to the waivers file under root, creating it if needed and
-// keeping existing entries and comments.
-func Add(root string, w Waiver) error {
+// Add records the approval in the log and appends w to the waivers file under
+// root, creating both if needed and keeping existing entries and comments.
+func Add(root string, w Waiver, a Approval) error {
 	var doc yaml.Node
 	data, err := os.ReadFile(path(root))
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -165,7 +252,30 @@ func Add(root string, w Waiver) error {
 	if err := os.MkdirAll(filepath.Dir(path(root)), 0o755); err != nil {
 		return err
 	}
+	// The log goes first: a stray log line grants nothing, while a waiver
+	// written without its line simply does not apply.
+	if err := appendLog(root, NewLogEntry(w, a)); err != nil {
+		return err
+	}
 	return os.WriteFile(path(root), out.Bytes(), 0o644)
+}
+
+func appendLog(root string, e LogEntry) error {
+	var line bytes.Buffer
+	enc := json.NewEncoder(&line) // Encode ends the line
+	enc.SetEscapeHTML(false)      // people read this file: keep <email> as written
+	if err := enc.Encode(e); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(logPath(root), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(line.Bytes()); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // waiversNode returns the value of the waivers key, adding the key if missing.
@@ -183,4 +293,8 @@ func waiversNode(top *yaml.Node) *yaml.Node {
 
 func path(root string) string {
 	return filepath.Join(root, filepath.FromSlash(FileName))
+}
+
+func logPath(root string) string {
+	return filepath.Join(root, filepath.FromSlash(LogName))
 }
