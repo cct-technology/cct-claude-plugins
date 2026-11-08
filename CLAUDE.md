@@ -23,7 +23,7 @@ How the pieces connect (details in the SPEC section named):
 
 ## Stack
 - Go (latest stable), standard library first. No CGO. `cobra` is acceptable for the CLI.
-- YAML: `gopkg.in/yaml.v3`. JSON Schema validation: `santhosh-tekuri/jsonschema`.
+- YAML: `go.yaml.in/yaml/v3` (the maintained successor of the archived `gopkg.in/yaml.v3`). JSON Schema validation: `santhosh-tekuri/jsonschema`.
 - Releases: GoReleaser, checksums published.
 - Shell only for the thin `bin/qk` shim and hook wrappers; keep logic in Go.
 

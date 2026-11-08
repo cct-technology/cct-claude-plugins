@@ -1,29 +1,39 @@
-// Command gen-docs regenerates the reference docs from the rule registry.
-// Run it from the repo root; CI fails when its output differs from what is committed.
+// Command gen-docs regenerates the reference docs from the rule registry and
+// the manifest schema. Run it from the repo root; CI fails when its output
+// differs from what is committed.
 package main
 
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
+	qualitykit "github.com/rkvalvaa/cct-claude-plugins"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
 )
 
-const rulesDoc = "docs/reference/rules.md"
-
 func main() {
-	var buf bytes.Buffer
-	if err := check.WriteReference(&buf, rules.All()); err != nil {
-		fail(err)
+	docs := map[string]func(io.Writer) error{
+		"docs/reference/rules.md": func(w io.Writer) error { return check.WriteReference(w, rules.All()) },
+		"docs/reference/manifest.md": func(w io.Writer) error {
+			return manifest.WriteReference(w, qualitykit.ManifestSchema)
+		},
 	}
-	if err := os.MkdirAll(filepath.Dir(rulesDoc), 0o755); err != nil {
-		fail(err)
-	}
-	if err := os.WriteFile(rulesDoc, buf.Bytes(), 0o644); err != nil {
-		fail(err)
+	for path, write := range docs {
+		var buf bytes.Buffer
+		if err := write(&buf); err != nil {
+			fail(fmt.Errorf("%s: %w", path, err))
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			fail(err)
+		}
+		if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+			fail(err)
+		}
 	}
 }
 

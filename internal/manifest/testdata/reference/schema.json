@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": { "description": "Schema version.", "const": 1 },
+    "maturity": {
+      "description": "How strict the repo is.",
+      "enum": ["bronze", "silver", "gold"],
+      "default": "bronze"
+    },
+    "modes": {
+      "description": "Mode | per check.",
+      "type": "object",
+      "propertyNames": { "description": "check key", "pattern": "^[a-z.]+$" },
+      "additionalProperties": { "enum": ["off", "advisory", "enforced"] }
+    },
+    "docs": {
+      "description": "Where docs live.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": { "description": "Docs folder.", "type": "string", "default": "docs" },
+        "diataxis": { "description": "Use Diátaxis folders.", "type": "boolean" },
+        "impact_map": {
+          "description": "Code paths mapped to docs.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["paths"],
+            "properties": {
+              "paths": { "description": "Code globs.", "$ref": "#/$defs/globs" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "globs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+  }
+}

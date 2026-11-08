@@ -16,25 +16,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
 )
 
 // version is set at release time with -ldflags "-X main.version=<tag>".
 var version = "dev"
 
-// schemaVersion is the quality.yaml schema version this qk reads.
-const schemaVersion = 1
-
 // errBlocking means an enforced rule failed: exit 1, and nothing on stderr.
 var errBlocking = errors.New("blocking findings")
 
 func main() {
-	// ponytail: no manifest loading yet, so every rule is advisory (CCT-3428 adds it).
-	os.Exit(run(rules.All(), check.Config{}, os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(run(rules.All(), os.Args[1:], os.Stdout, os.Stderr))
 }
 
-func run(reg []check.Rule, cfg check.Config, args []string, stdout, stderr io.Writer) int {
-	root := newRootCmd(reg, cfg)
+func run(reg []check.Rule, args []string, stdout, stderr io.Writer) int {
+	root := newRootCmd(reg)
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
@@ -49,7 +46,7 @@ func run(reg []check.Rule, cfg check.Config, args []string, stdout, stderr io.Wr
 	return 2
 }
 
-func newRootCmd(reg []check.Rule, cfg check.Config) *cobra.Command {
+func newRootCmd(reg []check.Rule) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "qk",
 		Short:         "Quality Kit: keeps docs, contracts and readiness in step with the code",
@@ -62,7 +59,7 @@ func newRootCmd(reg []check.Rule, cfg check.Config) *cobra.Command {
 		Short: "Print the qk version and the manifest schema version",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "qk %s (manifest schema %d)\n", version, schemaVersion)
+			fmt.Fprintf(cmd.OutOrStdout(), "qk %s (manifest schema %d)\n", version, manifest.SchemaVersion)
 		},
 	})
 
@@ -75,11 +72,13 @@ func newRootCmd(reg []check.Rule, cfg check.Config) *cobra.Command {
 			if !slices.Contains(check.Formats, format) {
 				return fmt.Errorf("unknown --format %q (want one of %s)", format, strings.Join(check.Formats, ", "))
 			}
+			// ponytail: the working directory is the repo root until CCT-3426 finds the git root.
 			root, err := os.Getwd()
 			if err != nil {
 				return err
 			}
-			rep := check.Run(reg, cfg, check.Context{Root: root})
+			m := manifest.Load(root)
+			rep := check.Run(reg, check.ConfigFrom(m), check.Context{Root: root, Manifest: m})
 			if err := check.WriteReport(cmd.OutOrStdout(), rep, format); err != nil {
 				return err
 			}

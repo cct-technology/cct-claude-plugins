@@ -1,0 +1,4 @@
+version: 1
+docs:
+  impact_map:
+    - paths: ["internal/**"]

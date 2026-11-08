@@ -1,0 +1,36 @@
+version: 1
+service: isms-operations
+owners: { product: rk, tech: rkvalvaa }
+data_class: internal
+maturity: silver
+modes:
+  docs.impact: enforced
+  contracts.breaking: off
+docs:
+  root: docs
+  diataxis: true
+  roles: [end-user, admin, developer]
+  impact_map:
+    - paths: ["internal/config/**"]
+      docs: ["docs/reference/settings.md"]
+    - paths: ["web/app/(admin)/**"]
+      docs: ["docs/how-to/admin/**"]
+generated:
+  - file: docs/reference/settings.md
+    cmd: go run ./cmd/gen-settings-doc
+contracts:
+  openapi: [api/openapi.yaml]
+  asyncapi: [api/asyncapi.yaml]
+  odcs: [contracts/*.odcs.yaml]
+security:
+  threat_models: docs/security/threat-models
+  specs_dir: docs/specs
+testing:
+  uat_dir: docs/testing/uat
+  replaces: [legacy-crm]
+ops:
+  runbooks: docs/how-to/operations
+privacy:
+  inventory: docs/privacy/data-inventory.yaml
+feedback:
+  linear_team: CCT

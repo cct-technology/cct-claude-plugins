@@ -57,24 +57,31 @@ func writeText(w io.Writer, rep Report) error {
 	return b.Flush()
 }
 
-// writeClaude lists only what an agent must act on: rule, file, what to do.
+// writeClaude lists what an agent must act on (rule, file, what to do), then
+// names every skipped check, so a check that could not run never reads as a pass.
 func writeClaude(w io.Writer, rep Report) error {
 	b := bufio.NewWriter(w)
 	s := rep.Summary
 	if s.Fail+s.Warn == 0 {
 		b.WriteString("Quality Kit: no findings.\n")
-		return b.Flush()
+	} else {
+		fmt.Fprintf(b, "Quality Kit: %d fail, %d warn.\n", s.Fail, s.Warn)
 	}
-	fmt.Fprintf(b, "Quality Kit: %d fail, %d warn.\n", s.Fail, s.Warn)
+	var skipped []string
 	for _, r := range rep.Results {
-		if r.Status != Fail && r.Status != Warn {
-			continue
+		switch r.Status {
+		case Fail, Warn:
+			fmt.Fprintf(b, "%s %s: %s\n", r.Rule, r.Status, r.Title)
+			for _, f := range r.Findings {
+				fmt.Fprintf(b, "- %s\n", findingLine(f))
+			}
+			fmt.Fprintf(b, "Fix: %s More: qk explain %s\n", r.Fix, r.Rule)
+		case Skipped:
+			skipped = append(skipped, fmt.Sprintf("%s (%s)", r.Rule, r.Reason))
 		}
-		fmt.Fprintf(b, "%s %s: %s\n", r.Rule, r.Status, r.Title)
-		for _, f := range r.Findings {
-			fmt.Fprintf(b, "- %s\n", findingLine(f))
-		}
-		fmt.Fprintf(b, "Fix: %s More: qk explain %s\n", r.Fix, r.Rule)
+	}
+	if len(skipped) > 0 {
+		fmt.Fprintf(b, "Skipped: %s\n", strings.Join(skipped, ", "))
 	}
 	return b.Flush()
 }

@@ -44,6 +44,17 @@ var clean = Report{
 	Summary: Summary{Pass: 1},
 }
 
+// onlySkipped has nothing to act on, but two checks did not run: the agent must still see that.
+var onlySkipped = Report{
+	Results: []RuleResult{
+		{Rule: "QK001", Check: "manifest.valid", Title: "quality.yaml is valid", Mode: Advisory, Status: Skipped,
+			Reason: "no quality.yaml; every check runs advisory with defaults"},
+		{Rule: "QK030", Check: "contracts.breaking", Title: "No breaking OpenAPI changes", Mode: Advisory, Status: Skipped,
+			Reason: "oasdiff not installed"},
+	},
+	Summary: Summary{Skipped: 2},
+}
+
 var refRules = []Rule{
 	{
 		ID: "QK001", Check: "manifest.valid", Title: "Manifest is valid", Phase: 1, EnforcedFrom: Bronze,
@@ -73,6 +84,7 @@ func TestWriteReportFormats(t *testing.T) {
 		{"claude", sample, "report.claude.golden"},
 		{"text", clean, "clean.text.golden"},
 		{"claude", clean, "clean.claude.golden"},
+		{"claude", onlySkipped, "skipped.claude.golden"},
 		{"json", Report{}, "empty.json.golden"},
 	}
 	for _, tt := range tests {

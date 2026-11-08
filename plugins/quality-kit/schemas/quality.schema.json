@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quality Kit manifest (quality.yaml), version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "description": "Manifest schema version. `qk` reads version 1.",
+      "const": 1
+    },
+    "service": {
+      "description": "Name of the service this repository builds.",
+      "type": "string"
+    },
+    "owners": {
+      "description": "Who answers for this repository.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "product": { "description": "Product owner.", "type": "string" },
+        "tech": { "description": "Technical owner, usually a GitHub handle.", "type": "string" }
+      }
+    },
+    "data_class": {
+      "description": "The most sensitive data the service handles.",
+      "enum": ["internal", "client", "public"]
+    },
+    "maturity": {
+      "description": "Sets every check's default mode. Bronze enforces only manifest validity; silver also enforces docs impact, contracts, waivers, generated files and supply chain; gold enforces every check.",
+      "enum": ["bronze", "silver", "gold"],
+      "default": "bronze"
+    },
+    "modes": {
+      "description": "Overrides the default mode of a check. Each key is a check key from the rule reference (for example `docs.impact`).",
+      "type": "object",
+      "propertyNames": {
+        "description": "check key",
+        "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+      },
+      "additionalProperties": { "enum": ["off", "advisory", "enforced"] }
+    },
+    "docs": {
+      "description": "Where the docs live and which code changes they must follow.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": { "description": "Docs folder.", "type": "string", "default": "docs" },
+        "diataxis": {
+          "description": "Docs follow the Diátaxis structure: tutorials, how-to, reference and explanation.",
+          "type": "boolean"
+        },
+        "roles": {
+          "description": "Reader roles the docs serve, for example `end-user`, `admin`, `developer`.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "impact_map": {
+          "description": "Changed code paths and the docs that must change with them (QK010).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["paths", "docs"],
+            "properties": {
+              "paths": { "description": "Globs for code paths, for example `internal/config/**`.", "$ref": "#/$defs/globs" },
+              "docs": { "description": "Globs for the docs that must change when those paths change.", "$ref": "#/$defs/globs" }
+            }
+          }
+        }
+      }
+    },
+    "generated": {
+      "description": "Files that must equal their generator's output (QK020).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "cmd"],
+        "properties": {
+          "file": { "description": "The generated file.", "type": "string", "minLength": 1 },
+          "cmd": { "description": "The command that generates it, run from the repository root.", "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "contracts": {
+      "description": "Contract files checked for breaking changes.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "openapi": { "description": "OpenAPI files (QK030).", "$ref": "#/$defs/globs" },
+        "asyncapi": { "description": "AsyncAPI files (QK031).", "$ref": "#/$defs/globs" },
+        "odcs": { "description": "Open Data Contract Standard files (QK032).", "$ref": "#/$defs/globs" }
+      }
+    },
+    "security": {
+      "description": "Where threat models and specs live.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "threat_models": { "description": "Threat model folder.", "type": "string" },
+        "specs_dir": { "description": "Spec folder. A new spec here needs a threat model (QK040).", "type": "string" }
+      }
+    },
+    "testing": {
+      "description": "Human testing.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uat_dir": { "description": "UAT plan folder.", "type": "string" },
+        "replaces": {
+          "description": "Tools this system replaces. When set, a parity matrix is required (QK051).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "ops": {
+      "description": "Operational readiness.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runbooks": { "description": "Runbook folder; every alert must reference a runbook here (QK080).", "type": "string" }
+      }
+    },
+    "privacy": {
+      "description": "Personal data.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inventory": { "description": "Personal-data inventory file (QK070).", "type": "string" }
+      }
+    },
+    "feedback": {
+      "description": "Where user feedback and follow-up work go.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "linear_team": { "description": "Linear team key.", "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "globs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+  }
+}

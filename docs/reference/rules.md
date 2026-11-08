@@ -6,4 +6,12 @@ Every rule that `qk check` runs. Rule IDs are stable and never reused.
 
 A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, `off` skips the rule. The `maturity` in `quality.yaml` sets the default mode. Override it per check under `modes`, using the check key. Without a `quality.yaml`, every rule is advisory.
 
-No rules are registered yet.
+## QK001 — quality.yaml is valid
+
+- Check key: `manifest.valid`
+- Phase: 1
+- Enforced by default at: bronze, silver, gold
+
+**What it checks.** `quality.yaml` matches the manifest schema, so every other check reads what the repo meant. An unknown key or a mistyped mode would otherwise be ignored or misread. A key under `modes` that names no known check is reported as a warning, not a failure, so a manifest written for a newer `qk` does not block an older one.
+
+**How to fix.** Correct the key or value named in the finding. Every allowed key and value is listed in `docs/reference/manifest.md`.

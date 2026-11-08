@@ -1,0 +1,2 @@
+Quality Kit: no findings.
+Skipped: QK001 (no quality.yaml; every check runs advisory with defaults), QK030 (oasdiff not installed)
