@@ -2,17 +2,33 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
 )
 
-func runQK(t *testing.T, reg []check.Rule, cfg check.Config, args ...string) (code int, stdout, stderr string) {
+func runQK(t *testing.T, reg []check.Rule, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
-	code = run(reg, cfg, args, &out, &errOut)
+	code = run(reg, args, &out, &errOut)
 	return code, out.String(), errOut.String()
+}
+
+// inRepo runs the test from a fresh directory holding quality.yaml with the
+// given content, or no quality.yaml when content is empty.
+func inRepo(t *testing.T, content string) {
+	t.Helper()
+	dir := t.TempDir()
+	if content != "" {
+		if err := os.WriteFile(filepath.Join(dir, "quality.yaml"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(dir)
 }
 
 func testRule(id, key string, res check.Result) check.Rule {
@@ -28,7 +44,7 @@ var failing = testRule("QK010", "docs.impact", check.Result{
 })
 
 func TestVersionPrintsQKAndManifestSchemaVersion(t *testing.T) {
-	code, out, _ := runQK(t, nil, check.Config{}, "version")
+	code, out, _ := runQK(t, nil, "version")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
@@ -39,7 +55,9 @@ func TestVersionPrintsQKAndManifestSchemaVersion(t *testing.T) {
 }
 
 func TestCheckExitsZeroWhenNothingBlocks(t *testing.T) {
-	code, out, errOut := runQK(t, []check.Rule{failing}, check.Config{}, "check")
+	inRepo(t, "")
+
+	code, out, errOut := runQK(t, []check.Rule{failing}, "check")
 
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0 for an advisory fail; stderr: %s", code, errOut)
@@ -50,7 +68,9 @@ func TestCheckExitsZeroWhenNothingBlocks(t *testing.T) {
 }
 
 func TestCheckExitsOneOnEnforcedFail(t *testing.T) {
-	code, out, errOut := runQK(t, []check.Rule{failing}, check.Config{Maturity: check.Silver}, "check")
+	inRepo(t, "version: 1\nmaturity: silver\n")
+
+	code, out, errOut := runQK(t, []check.Rule{failing}, "check")
 
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
@@ -63,8 +83,56 @@ func TestCheckExitsOneOnEnforcedFail(t *testing.T) {
 	}
 }
 
+func TestCheckModesOverrideFromManifest(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\nmodes:\n  docs.impact: off\n")
+
+	code, out, _ := runQK(t, []check.Rule{failing}, "check")
+
+	if code != 0 || strings.Contains(out, "QK010") {
+		t.Errorf("exit code = %d, stdout = %q, want QK010 turned off", code, out)
+	}
+}
+
+func TestCheckWithoutManifestSkipsQK001(t *testing.T) {
+	inRepo(t, "")
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 0 || !strings.Contains(out, "SKIP  QK001") {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
+func TestCheckInvalidManifestBlocks(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: platinum\n")
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(out, "FAIL  QK001") || !strings.Contains(out, "quality.yaml: maturity: value must be one of") {
+		t.Errorf("stdout = %q", out)
+	}
+}
+
+func TestCheckUnreadableManifestFailsOpen(t *testing.T) {
+	inRepo(t, "")
+	if err := os.Mkdir("quality.yaml", 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	code, out, _ := runQK(t, rules.All(), "check")
+
+	if code != 0 || !strings.Contains(out, "SKIP  QK001") {
+		t.Errorf("exit code = %d, stdout = %q", code, out)
+	}
+}
+
 func TestCheckFormatClaude(t *testing.T) {
-	_, out, _ := runQK(t, []check.Rule{failing}, check.Config{Maturity: check.Silver}, "check", "--format", "claude")
+	inRepo(t, "version: 1\nmaturity: silver\n")
+
+	_, out, _ := runQK(t, []check.Rule{failing}, "check", "--format", "claude")
 
 	if !strings.HasPrefix(out, "Quality Kit: 1 fail, 0 warn.\nQK010 fail:") {
 		t.Errorf("stdout = %q", out)
@@ -72,11 +140,12 @@ func TestCheckFormatClaude(t *testing.T) {
 }
 
 func TestCheckUnknownFormatIsAUsageErrorAndRunsNothing(t *testing.T) {
+	inRepo(t, "")
 	ran := false
 	r := failing
 	r.Run = func(check.Context) check.Result { ran = true; return check.Result{Status: check.Pass} }
 
-	code, out, errOut := runQK(t, []check.Rule{r}, check.Config{}, "check", "--format", "xml")
+	code, out, errOut := runQK(t, []check.Rule{r}, "check", "--format", "xml")
 
 	if code != 2 {
 		t.Errorf("exit code = %d, want 2", code)
@@ -90,7 +159,7 @@ func TestCheckUnknownFormatIsAUsageErrorAndRunsNothing(t *testing.T) {
 }
 
 func TestExplainKnownRule(t *testing.T) {
-	code, out, _ := runQK(t, []check.Rule{failing}, check.Config{}, "explain", "qk010")
+	code, out, _ := runQK(t, []check.Rule{failing}, "explain", "qk010")
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
@@ -101,7 +170,7 @@ func TestExplainKnownRule(t *testing.T) {
 }
 
 func TestExplainUnknownRuleIsAUsageError(t *testing.T) {
-	code, _, errOut := runQK(t, []check.Rule{failing}, check.Config{}, "explain", "QK999")
+	code, _, errOut := runQK(t, []check.Rule{failing}, "explain", "QK999")
 
 	if code != 2 {
 		t.Errorf("exit code = %d, want 2", code)
@@ -112,7 +181,7 @@ func TestExplainUnknownRuleIsAUsageError(t *testing.T) {
 }
 
 func TestUnknownCommandIsAUsageError(t *testing.T) {
-	if code, _, _ := runQK(t, nil, check.Config{}, "bogus"); code != 2 {
+	if code, _, _ := runQK(t, nil, "bogus"); code != 2 {
 		t.Errorf("exit code = %d, want 2", code)
 	}
 }

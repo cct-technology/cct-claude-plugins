@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+
+	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 )
 
 // Status is what a rule reports.
@@ -57,7 +59,8 @@ type Result struct {
 
 // Context is what a rule can see.
 type Context struct {
-	Root string // repository root
+	Root     string          // repository root
+	Manifest manifest.Loaded // quality.yaml, if any
 }
 
 // Rule is one registered check. IDs are stable and never reused.
@@ -76,6 +79,32 @@ type Rule struct {
 type Config struct {
 	Maturity Maturity
 	Modes    map[string]Mode // check key -> override
+}
+
+// ConfigFrom turns a loaded quality.yaml into a Config.
+func ConfigFrom(l manifest.Loaded) Config {
+	if !l.Present || l.Err != nil {
+		return Config{} // no manifest, or unreadable (fail open): everything advisory
+	}
+	// A manifest exists, so the repo is at least bronze and QK001 blocks.
+	// An invalid one cannot be trusted further: no maturity, no overrides.
+	cfg := Config{Maturity: Bronze}
+	if len(l.Problems) > 0 {
+		return cfg
+	}
+	switch l.Manifest.Maturity {
+	case "silver":
+		cfg.Maturity = Silver
+	case "gold":
+		cfg.Maturity = Gold
+	}
+	for key, mode := range l.Manifest.Modes { // values are schema-checked: off, advisory or enforced
+		if cfg.Modes == nil {
+			cfg.Modes = map[string]Mode{}
+		}
+		cfg.Modes[key] = Mode(mode)
+	}
+	return cfg
 }
 
 // ModeFor returns the mode rule r runs in under c.

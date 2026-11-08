@@ -1,8 +1,12 @@
 package check
 
 import (
+	"errors"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 )
 
 func rule(id, key string, from Maturity, res Result) Rule {
@@ -165,6 +169,41 @@ func TestRunKeepsRegistryOrderAndCounts(t *testing.T) {
 	}
 	if rep.Summary != (Summary{Pass: 1, Fail: 1, Skipped: 1}) {
 		t.Errorf("summary = %+v", rep.Summary)
+	}
+}
+
+func TestConfigFrom(t *testing.T) {
+	tests := []struct {
+		name string
+		in   manifest.Loaded
+		want Config
+	}{
+		{"no manifest: all advisory", manifest.Loaded{}, Config{}},
+		{"unreadable manifest fails open", manifest.Loaded{Present: true, Err: errors.New("denied")}, Config{}},
+		{"maturity omitted means bronze",
+			manifest.Loaded{Present: true, Manifest: manifest.Manifest{Version: 1}},
+			Config{Maturity: Bronze}},
+		{"silver with modes",
+			manifest.Loaded{Present: true, Manifest: manifest.Manifest{
+				Version: 1, Maturity: "silver",
+				Modes: map[string]string{"docs.impact": "off", "contracts.breaking": "enforced"},
+			}},
+			Config{Maturity: Silver, Modes: map[string]Mode{"docs.impact": Off, "contracts.breaking": Enforced}}},
+		{"gold", manifest.Loaded{Present: true, Manifest: manifest.Manifest{Version: 1, Maturity: "gold"}},
+			Config{Maturity: Gold}},
+		// An invalid manifest cannot be trusted, but QK001 must still block: treat it as bronze, no overrides.
+		{"invalid manifest is bronze without overrides",
+			manifest.Loaded{Present: true,
+				Manifest: manifest.Manifest{Version: 1, Maturity: "gold", Modes: map[string]string{"manifest.valid": "off"}},
+				Problems: []manifest.Problem{{Path: "x", Message: "bad"}}},
+			Config{Maturity: Bronze}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ConfigFrom(tt.in); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ConfigFrom = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 
