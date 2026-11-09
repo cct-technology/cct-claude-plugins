@@ -9,17 +9,16 @@ permissions:
   contents: read
 
 jobs:
+  # Quality Kit checks this repository with the workflow it ships, built from
+  # the pull request's own qk.
   quality:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # qk compares against the merge-base with main
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - run: go run ./cmd/qk check --base origin/main
+    uses: ./.github/workflows/quality.yml
+    with:
+      build-from-source: true
+    permissions:
+      contents: read
+      pull-requests: write
 
   go:
     strategy:

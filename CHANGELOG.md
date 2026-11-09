@@ -4,6 +4,8 @@
 
 ### Added
 
+- Reusable GitHub Actions workflow `.github/workflows/quality.yml`. It installs the checksum-verified `qk` release, runs `qk check` against the pull request's base, and keeps one comment on the pull request up to date. It also keeps the SARIF as an artifact, and uploads it to code scanning when asked. The job fails when an enforced check fails or the downloaded `qk` does not match its checksum; other problems with Quality Kit only warn. This repository's CI now runs it.
+- `qk check --format sarif` writes SARIF 2.1.0. Waived findings are results with an `external` suppression giving the waiver reason, and checks that did not run are notifications.
 - Hooks. When a session starts, Claude gets the `qk context` summary. When Claude tries to finish, `qk check --changed` runs: enforced failures send Claude back with the findings, at most twice in a row, then the stop is allowed with "Quality Kit: unresolved findings, handing over to a human". Advisory findings and checks that could not run are shown to the person. The exception guard asks a person before Claude records an exception or changes `.quality/` or `quality.yaml`.
 - `qk hook session-start` and `qk hook stop`. Any `qk hook` error is a warning on stderr with exit 0, including a hook this `qk` does not have.
 - When `bin/qk` cannot find or download `qk`, the session-start hook also shows the person a message, because Claude Code hides stderr from a hook that exits 0.

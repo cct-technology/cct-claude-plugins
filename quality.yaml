@@ -16,6 +16,8 @@ docs:
       docs: ["docs/how-to/**"]
     - paths: ["plugins/quality-kit/bin/**", ".goreleaser.yaml"]
       docs: ["docs/how-to/get-the-qk-binary.md", "docs/how-to/release-quality-kit.md"]
+    - paths: [".github/workflows/quality.yml"]
+      docs: ["docs/how-to/run-quality-kit-in-github-actions.md"]
 generated:
   - file: docs/reference/rules.md
     cmd: go run ./cmd/gen-docs

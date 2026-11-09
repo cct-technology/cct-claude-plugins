@@ -30,6 +30,10 @@ import (
 // version is set at release time with -ldflags "-X main.version=<tag>".
 var version = "dev"
 
+// checkFormats are the --format values for qk check. SARIF needs the rule
+// registry and the qk version, so it is written by check.WriteSARIF.
+var checkFormats = append(slices.Clone(check.Formats), "sarif")
+
 // errBlocking means an enforced rule failed: exit 1, and nothing on stderr.
 var errBlocking = errors.New("blocking findings")
 
@@ -94,8 +98,8 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 		Short: "Run every check and report what is missing or stale",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if !slices.Contains(check.Formats, format) {
-				return fmt.Errorf("unknown --format %q (want one of %s)", format, strings.Join(check.Formats, ", "))
+			if !slices.Contains(checkFormats, format) {
+				return fmt.Errorf("unknown --format %q (want one of %s)", format, strings.Join(checkFormats, ", "))
 			}
 			root, err := repoRoot()
 			if err != nil {
@@ -107,7 +111,12 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 				return ctx.ChangesErr // the user named a base that does not exist: usage error
 			}
 			rep := check.Run(reg, check.ConfigFrom(ctx.Manifest), ctx)
-			if err := check.WriteReport(cmd.OutOrStdout(), rep, format); err != nil {
+			if format == "sarif" {
+				err = check.WriteSARIF(cmd.OutOrStdout(), rep, reg, version)
+			} else {
+				err = check.WriteReport(cmd.OutOrStdout(), rep, format)
+			}
+			if err != nil {
 				return err
 			}
 			if rep.Blocking {
@@ -116,7 +125,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 			return nil
 		},
 	}
-	checkCmd.Flags().StringVar(&format, "format", "text", "output format: "+strings.Join(check.Formats, ", "))
+	checkCmd.Flags().StringVar(&format, "format", "text", "output format: "+strings.Join(checkFormats, ", "))
 	checkCmd.Flags().StringVar(&base, "base", "", "compare against the merge-base with this ref (default: the default branch, from origin/HEAD, main or master)")
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
 	root.AddCommand(checkCmd)
