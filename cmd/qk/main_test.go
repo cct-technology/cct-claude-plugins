@@ -634,3 +634,24 @@ func TestDocsImpactNeedsGit(t *testing.T) {
 		t.Errorf("exit code = %d, stderr = %q", code, errOut)
 	}
 }
+
+func TestContextWithoutManifest(t *testing.T) {
+	inRepo(t, "")
+
+	code, out, errOut := runQK(t, rules.All(), "context")
+
+	if code != 0 || !strings.Contains(out, "no quality.yaml") {
+		t.Errorf("code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+}
+
+func TestContextReportsEnforcedFailureWithoutBlocking(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	reg := []check.Rule{testRule("QK010", "docs.impact", check.Result{Status: check.Fail, Findings: []check.Finding{{Message: "x"}}})}
+
+	code, out, errOut := runQK(t, reg, "context")
+
+	if code != 0 || !strings.Contains(out, "QK010 enforced, 1 open") {
+		t.Errorf("code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+}

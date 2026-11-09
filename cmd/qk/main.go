@@ -86,11 +86,8 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := check.Context{
-				Root: root, Manifest: manifest.Load(root), ChangedOnly: changedOnly,
-				Waivers: waivers.Load(root), Today: time.Now(),
-			}
-			ctx.Changes, ctx.ChangesErr = changes.Compute(root, base)
+			ctx := newContext(root, base)
+			ctx.ChangedOnly = changedOnly
 			if errors.Is(ctx.ChangesErr, changes.ErrBadBase) {
 				return ctx.ChangesErr // the user named a base that does not exist: usage error
 			}
@@ -108,6 +105,18 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	checkCmd.Flags().StringVar(&base, "base", "", "compare against the merge-base with this ref (default: the default branch, from origin/HEAD, main or master)")
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
 	root.AddCommand(checkCmd)
+	root.AddCommand(&cobra.Command{
+		Use:   "context",
+		Short: "Print a short summary for the start of a session",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root, err := repoRoot()
+			if err != nil {
+				return err
+			}
+			return check.WriteSessionSummary(cmd.OutOrStdout(), reg, newContext(root, ""))
+		},
+	})
 	root.AddCommand(newWaiverCmd(reg))
 	root.AddCommand(newDocsImpactCmd())
 	root.AddCommand(newHookCmd())
@@ -127,6 +136,13 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	})
 
 	return root
+}
+
+// newContext gathers what rules see for the repository at root.
+func newContext(root, base string) check.Context {
+	ctx := check.Context{Root: root, Manifest: manifest.Load(root), Waivers: waivers.Load(root), Today: time.Now()}
+	ctx.Changes, ctx.ChangesErr = changes.Compute(root, base)
+	return ctx
 }
 
 // repoRoot is the git top level, or the working directory outside git.

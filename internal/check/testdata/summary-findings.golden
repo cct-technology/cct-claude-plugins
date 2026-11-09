@@ -1,0 +1,9 @@
+Quality Kit: maturity silver.
+Enforced: QK001, QK010, QK020, QK030.
+Advisory: QK110.
+Open findings:
+- QK010 enforced, 2 open: Docs change with the code
+- QK110 advisory, 1 open: CODEOWNERS covers every path
+Details: qk check --format claude
+Skipped: QK030 (oasdiff not installed)
+Not run at session start: QK020.
