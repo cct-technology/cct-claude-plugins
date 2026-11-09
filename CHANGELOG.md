@@ -4,6 +4,7 @@
 
 ### Added
 
+- `qk context` prints a short summary for the start of a session: maturity, which checks are enforced or advisory, open findings per check, and waivers ending within 14 days. At most 30 lines; exits 0 even when an enforced check fails. Slow checks (QK020, QK060) are left out and named.
 - `bin/qk` in the plugin finds the `qk` binary its version needs: on `PATH`, in the cache, or by downloading the matching release and verifying its checksum. If none works it warns on stderr and exits 0.
 - Release pipeline: pushing a version tag publishes archives for darwin, linux and windows on amd64 and arm64, with `checksums.txt`. The release fails when the tag does not match `version` in `plugin.json`.
 - This repository checks itself: `quality.yaml` at silver, CODEOWNERS, and `qk check` on every pull request.

@@ -33,3 +33,13 @@ Checks that scan the whole repository then look only at the files changed agains
 - `--format claude` lists only what needs acting on, then a `Skipped:` line.
 
 Exit code `0`: nothing blocks. `1`: an enforced check failed. `2`: usage error.
+
+## See a short summary
+
+```sh
+qk context
+```
+
+This prints the maturity, which checks are enforced or advisory, open findings per check, and waivers ending within 14 days, in at most 30 lines. It is what Claude sees at the start of a session. It exits `0` even when an enforced check fails, and it leaves out slow checks (QK020, QK060) and names them, so run `qk check` before relying on them.
+
+Without a `quality.yaml` it prints one line saying checks run advisory with defaults.

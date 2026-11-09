@@ -1,0 +1,6 @@
+Quality Kit: maturity silver.
+Enforced: QK001, QK010.
+No open findings.
+Waivers expiring within 14 days:
+- QK010 docs/**, api/**, ends 2026-11-20 (owner rk)
+- QK030, ends 2026-11-23 (owner rk)
