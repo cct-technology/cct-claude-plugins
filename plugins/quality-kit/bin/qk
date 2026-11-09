@@ -2,16 +2,25 @@
 # Finds the qk binary this plugin version needs and runs it: qk on PATH, then
 # the cache, then a checksum-verified download from the release. When none of
 # those works it warns on stderr and exits 0, because tooling problems must
-# never block (docs/SPEC.md, design rule 7). Warnings stay off stdout, which
-# hooks parse.
+# never block (docs/SPEC.md, design rule 7). Warnings go to stderr, except
+# that the SessionStart hook also gets one as JSON on stdout (see warn).
 #
 # The required version is the "version" in the plugin's plugin.json.
 
 # Another copy of this shim is not a real qk. See is_required.
 [ -z "${QK_SHIM_PROBE:-}" ] || exit 1
 
+session_start=
+[ "${1:-}" = hook ] && [ "${2:-}" = session-start ] && session_start=1
+
 warn() {
-	echo "quality-kit: $1. qk did not run." >&2
+	msg="quality-kit: $1. qk did not run."
+	echo "$msg" >&2
+	# Claude Code hides stderr from a hook that exits 0, so a repo with no qk
+	# would look clean. SessionStart tells the person, once per session.
+	if [ -n "$session_start" ]; then
+		printf '{"systemMessage":"%s"}\n' "$(printf '%s' "$msg" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+	fi
 	exit 0
 }
 

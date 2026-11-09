@@ -4,6 +4,9 @@
 
 ### Added
 
+- Hooks. When a session starts, Claude gets the `qk context` summary. When Claude tries to finish, `qk check --changed` runs: enforced failures send Claude back with the findings, at most twice in a row, then the stop is allowed with "Quality Kit: unresolved findings, handing over to a human". Advisory findings and checks that could not run are shown to the person. The exception guard asks a person before Claude records an exception or changes `.quality/` or `quality.yaml`.
+- `qk hook session-start` and `qk hook stop`. Any `qk hook` error is a warning on stderr with exit 0, including a hook this `qk` does not have.
+- When `bin/qk` cannot find or download `qk`, the session-start hook also shows the person a message, because Claude Code hides stderr from a hook that exits 0.
 - `qk context` prints a short summary for the start of a session: maturity, which checks are enforced or advisory, open findings per check, and waivers ending within 14 days. At most 30 lines; exits 0 even when an enforced check fails. Slow checks (QK020, QK060) are left out and named.
 - `bin/qk` in the plugin finds the `qk` binary its version needs: on `PATH`, in the cache, or by downloading the matching release and verifying its checksum. If none works it warns on stderr and exits 0.
 - Release pipeline: pushing a version tag publishes archives for darwin, linux and windows on amd64 and arm64, with `checksums.txt`. The release fails when the tag does not match `version` in `plugin.json`.
