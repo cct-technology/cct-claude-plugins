@@ -143,6 +143,32 @@ func TestCheckFormatClaude(t *testing.T) {
 	}
 }
 
+func TestCheckFormatSARIF(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+
+	code, out, _ := runQK(t, []check.Rule{failing}, "check", "--format", "sarif")
+
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1: SARIF output does not change what blocks", code)
+	}
+	var log struct {
+		Version string
+		Runs    []struct {
+			Tool    struct{ Driver struct{ Version string } }
+			Results []struct{ RuleID, Level string }
+		}
+	}
+	if err := json.Unmarshal([]byte(out), &log); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, out)
+	}
+	if log.Version != "2.1.0" || len(log.Runs) != 1 || log.Runs[0].Tool.Driver.Version != "dev" {
+		t.Errorf("want a SARIF 2.1.0 log from qk dev, got %+v", log)
+	}
+	if res := log.Runs[0].Results; len(res) != 1 || res[0].RuleID != "QK010" || res[0].Level != "error" {
+		t.Errorf("results = %+v, want the QK010 failure as an error", res)
+	}
+}
+
 func TestCheckUnknownFormatIsAUsageErrorAndRunsNothing(t *testing.T) {
 	inRepo(t, "")
 	ran := false

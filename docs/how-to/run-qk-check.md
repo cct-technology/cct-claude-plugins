@@ -31,6 +31,7 @@ Checks that scan the whole repository then look only at the files changed agains
 - `--format text` (default) lists every check.
 - `--format json` is for tools.
 - `--format claude` lists only what needs acting on, then a `Skipped:` line.
+- `--format sarif` is SARIF 2.1.0, for GitHub code scanning and other SARIF readers. See [run Quality Kit in GitHub Actions](run-quality-kit-in-github-actions.md).
 
 Exit code `0`: nothing blocks. `1`: an enforced check failed. `2`: usage error.
 

@@ -1,0 +1,171 @@
+# Quality Kit for GitHub Actions. A repository calls it in one job:
+#
+#   jobs:
+#     quality:
+#       uses: rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
+#       permissions: { contents: read, pull-requests: write }
+#       secrets: { QK_RELEASE_TOKEN: "${{ secrets.QK_RELEASE_TOKEN }}" }
+#
+# It runs qk check against the base branch, keeps the SARIF as an artifact
+# (and in code scanning when asked), and keeps one comment on the pull
+# request up to date. The job fails when an enforced check fails, or when the
+# downloaded qk does not match its checksum. Any other problem with Quality
+# Kit itself is a warning, as in the hooks.
+# See docs/how-to/run-quality-kit-in-github-actions.md.
+name: Quality Kit
+
+on:
+  workflow_call:
+    inputs:
+      qk-version:
+        description: The qk release to install. Equal to the plugin version; a test checks.
+        type: string
+        default: "0.1.0"
+      code-scanning:
+        description: Also upload the SARIF to GitHub code scanning. Private repositories need GitHub Code Security for this.
+        type: boolean
+        default: false
+      build-from-source:
+        description: Build qk from the checked-out repository instead of installing a release. Only for the Quality Kit repository itself.
+        type: boolean
+        default: false
+    secrets:
+      QK_RELEASE_TOKEN:
+        description: A token that can read the releases of rkvalvaa/cct-claude-plugins. Needed while that repository is private.
+        required: false
+
+jobs:
+  check:
+    name: qk check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # qk compares against the merge-base with the base branch
+
+      - name: Install qk
+        id: install
+        if: ${{ !inputs.build-from-source }}
+        env:
+          GH_TOKEN: ${{ secrets.QK_RELEASE_TOKEN || github.token }}
+          VERSION: ${{ inputs.qk-version }}
+        run: |
+          problem() {
+            echo "::warning::Quality Kit: $1. qk did not run."
+            echo "problem=$1" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          case $(uname -m) in
+          x86_64) arch=amd64 ;;
+          aarch64 | arm64) arch=arm64 ;;
+          *) problem "no qk release for $(uname -m)" ;;
+          esac
+          asset="qk_${VERSION}_linux_${arch}.tar.gz"
+          dir="$RUNNER_TEMP/qk"
+          mkdir -p "$dir"
+          cd "$dir"
+          gh release download "v$VERSION" -R rkvalvaa/cct-claude-plugins -p "$asset" -p checksums.txt ||
+            problem "could not download $asset (set the QK_RELEASE_TOKEN secret while rkvalvaa/cct-claude-plugins is private)"
+          # A mismatch may be a tampered release: fail loudly, never just warn.
+          if ! awk -v a="$asset" '$2 == a' checksums.txt | sha256sum -c --status -; then
+            echo "qk did not run: checksum mismatch for $asset, refusing it." > "$RUNNER_TEMP/qk-summary.txt"
+            echo "::error::Quality Kit: checksum mismatch for $asset, refusing it."
+            exit 1
+          fi
+          tar -xzf "$asset" qk || problem "could not unpack $asset"
+          case $(./qk version) in
+          "qk $VERSION "*) ;;
+          *) problem "$asset does not run as qk $VERSION" ;;
+          esac
+          echo "$dir" >> "$GITHUB_PATH"
+
+      # ponytail: lets the Quality Kit repository test this workflow on its own
+      # pull requests, with the qk they change, before any release exists.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: inputs.build-from-source
+        with:
+          go-version-file: go.mod
+      - name: Build qk from this repository
+        if: inputs.build-from-source
+        run: |
+          mkdir -p "$RUNNER_TEMP/qk"
+          go build -o "$RUNNER_TEMP/qk/qk" ./cmd/qk
+          echo "$RUNNER_TEMP/qk" >> "$GITHUB_PATH"
+
+      - name: qk check
+        id: check
+        env:
+          BASE: ${{ github.base_ref || github.event.repository.default_branch }}
+          PROBLEM: ${{ steps.install.outputs.problem }}
+        # Output goes to RUNNER_TEMP: a file in the checkout would count as a change.
+        run: |
+          summary="$RUNNER_TEMP/qk-summary.txt"
+          if ! command -v qk >/dev/null 2>&1; then
+            echo "qk did not run: ${PROBLEM:-qk is not installed}." > "$summary"
+          else
+            code=0
+            qk check --base "origin/$BASE" --format sarif > "$RUNNER_TEMP/qk.sarif" || code=$?
+            if [ "$code" -le 1 ]; then
+              echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+              echo "sarif=true" >> "$GITHUB_OUTPUT"
+              # ponytail: a second run for the summary doubles the time; write
+              # both formats in one run once the slow checks (QK020, QK060) land.
+              qk check --base "origin/$BASE" --format claude > "$summary" || true
+            else
+              echo "::error::Quality Kit: qk check exited $code. See its message above."
+              echo "qk check could not run (exit $code). See the workflow log." > "$summary"
+            fi
+          fi
+          cat "$summary"
+          { echo '### Quality Kit'; echo; echo '```text'; cat "$summary"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the SARIF
+        if: steps.check.outputs.sarif == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: quality-kit-sarif
+          path: ${{ runner.temp }}/qk.sarif
+
+      - name: Upload to code scanning
+        if: inputs.code-scanning && steps.check.outputs.sarif == 'true'
+        continue-on-error: true # findings still reach the comment and the artifact
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ runner.temp }}/qk.sarif
+          category: quality-kit
+
+      - name: Comment on the pull request
+        # A fork's pull request gets a read-only token, so it gets no comment.
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true # a missing pull-requests: write must not fail the check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          marker='<!-- quality-kit -->'
+          body="$RUNNER_TEMP/comment.md"
+          {
+            echo "$marker"
+            echo '### Quality Kit'
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/qk-summary.txt"
+            echo '```'
+            echo
+            echo "[Workflow run]($RUN_URL)"
+          } > "$body"
+          # One comment per pull request, edited on every push.
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F "body=@$body" > /dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F "body=@$body" > /dev/null
+          fi
+
+      - name: Enforced checks pass
+        if: steps.check.outputs.exit-code == '1'
+        run: |
+          echo "::error::Quality Kit: an enforced check failed. The findings are in the qk check step and on the pull request."
+          exit 1

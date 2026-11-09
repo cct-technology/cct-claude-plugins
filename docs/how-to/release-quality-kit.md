@@ -2,7 +2,7 @@
 
 A release publishes `qk` binaries and tells existing plugin installs to update. One version number drives both.
 
-1. Raise `version` in `plugins/quality-kit/.claude-plugin/plugin.json`. Claude Code only updates an installed plugin when this changes, and `bin/qk` downloads the release named after it.
+1. Raise `version` in `plugins/quality-kit/.claude-plugin/plugin.json`. Claude Code only updates an installed plugin when this changes, and `bin/qk` downloads the release named after it. Raise the `qk-version` default in `.github/workflows/quality.yml` to match; a test fails while they differ.
 2. Move the `## Unreleased` entries in `CHANGELOG.md` under a heading for the new version.
 3. Merge that change to `main`.
 4. Tag the merge commit `v` plus the same version, and push the tag:

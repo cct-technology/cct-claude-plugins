@@ -1,0 +1,203 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Quality Kit",
+          "version": "0.1.0",
+          "informationUri": "https://github.com/rkvalvaa/cct-claude-plugins",
+          "rules": [
+            {
+              "id": "QK010",
+              "shortDescription": {
+                "text": "Docs change with mapped code"
+              },
+              "fullDescription": {
+                "text": "Changed paths in `impact_map` need their docs changed too."
+              },
+              "help": {
+                "text": "Update the mapped docs. More: qk explain QK010"
+              }
+            },
+            {
+              "id": "QK110",
+              "shortDescription": {
+                "text": "CODEOWNERS covers every top-level path"
+              },
+              "fullDescription": {
+                "text": "Every finding needs an owner."
+              },
+              "help": {
+                "text": "Add a CODEOWNERS line. More: qk explain QK110"
+              }
+            },
+            {
+              "id": "QK001",
+              "shortDescription": {
+                "text": "Manifest is valid"
+              },
+              "fullDescription": {
+                "text": "`quality.yaml` matches the schema."
+              },
+              "help": {
+                "text": "Correct the key named in the finding. More: qk explain QK001"
+              }
+            },
+            {
+              "id": "QK020",
+              "shortDescription": {
+                "text": "Generated files are current"
+              },
+              "fullDescription": {
+                "text": "Generated files equal their generator's output."
+              },
+              "help": {
+                "text": "Run the generator. More: qk explain QK020"
+              }
+            },
+            {
+              "id": "QK030",
+              "shortDescription": {
+                "text": "No breaking OpenAPI changes"
+              },
+              "fullDescription": {
+                "text": "OpenAPI changes do not break clients."
+              },
+              "help": {
+                "text": "Version the API. More: qk explain QK030"
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": [
+            {
+              "level": "warning",
+              "message": {
+                "text": "QK030 did not run: oasdiff not installed"
+              },
+              "associatedRule": {
+                "id": "QK030",
+                "index": 4
+              }
+            }
+          ]
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "QK010",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "docs/reference/settings.md must change too"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "internal/config/load.go",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "3259f20ee89e78b658ebc4fa00f2056f"
+          }
+        },
+        {
+          "ruleId": "QK010",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "no Docs-Impact trailer in the range"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "quality.yaml",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "f21f9b5e8b80aa19285711f9fa7e88af"
+          }
+        },
+        {
+          "ruleId": "QK110",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "no owner"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "scripts",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "6ccdba14947ba57d6cef7a73fe07f2df"
+          }
+        },
+        {
+          "ruleId": "QK020",
+          "ruleIndex": 3,
+          "level": "error",
+          "message": {
+            "text": "differs from generator output"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/reference/settings.md",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "10363e828080461d4284d416163b1c36"
+          },
+          "suppressions": [
+            {
+              "kind": "external",
+              "status": "accepted",
+              "justification": "generator moves in CCT-1",
+              "properties": {
+                "expires": "2026-12-31",
+                "owner": "rk"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
