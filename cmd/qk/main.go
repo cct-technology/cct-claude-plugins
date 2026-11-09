@@ -28,7 +28,7 @@ import (
 )
 
 // version is set at release time with -ldflags "-X main.version=<tag>".
-var version = "dev"
+var version = "dev" // temporary: makes QK010 fail on this PR
 
 // checkFormats are the --format values for qk check. SARIF needs the rule
 // registry and the qk version, so it is written by check.WriteSARIF.
