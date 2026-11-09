@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -653,5 +655,152 @@ func TestContextReportsEnforcedFailureWithoutBlocking(t *testing.T) {
 
 	if code != 0 || !strings.Contains(out, "QK010 enforced, 1 open") {
 		t.Errorf("code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+}
+
+// runHookEvent pipes a hook input recorded from Claude Code into qk hook <event>.
+func runHookEvent(t *testing.T, reg []check.Rule, event, recording string) (code int, stdout, stderr string) {
+	t.Helper()
+	input, err := os.ReadFile(filepath.Join(hookRecordings, recording))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	code = run(reg, []string{"hook", event}, bytes.NewReader(input), &out, &errOut)
+	return code, out.String(), errOut.String()
+}
+
+// hookRecordings is resolved before any test changes directory.
+var hookRecordings, _ = filepath.Abs(filepath.Join("..", "..", "internal", "hook", "testdata"))
+
+func hookJSON(t *testing.T, stdout string) map[string]any {
+	t.Helper()
+	var v map[string]any
+	if err := json.Unmarshal([]byte(stdout), &v); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
+	}
+	return v
+}
+
+func failingRule(id, key string) check.Rule {
+	return testRule(id, key, check.Result{Status: check.Fail, Findings: []check.Finding{{File: "internal/x.go", Message: "docs/x.md must change too"}}})
+}
+
+func TestSessionStartHookAddsTheSummary(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+
+	code, out, errOut := runHookEvent(t, []check.Rule{failingRule("QK010", "docs.impact")}, "session-start", "session-start.json")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
+	}
+	specific, _ := hookJSON(t, out)["hookSpecificOutput"].(map[string]any)
+	context, _ := specific["additionalContext"].(string)
+	if specific["hookEventName"] != "SessionStart" || !strings.Contains(context, "QK010 enforced, 1 open") {
+		t.Errorf("stdout = %s", out)
+	}
+}
+
+func TestStopHookAdvisoryShowsFindingsAndAllows(t *testing.T) {
+	inRepo(t, "")
+	t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+
+	code, out, errOut := runHookEvent(t, []check.Rule{failingRule("QK010", "docs.impact")}, "stop", "stop.json")
+
+	v := hookJSON(t, out)
+	if code != 0 || v["decision"] != nil || !strings.Contains(fmt.Sprint(v["systemMessage"]), "docs/x.md must change too") {
+		t.Errorf("exit code = %d, stdout = %s, stderr = %q", code, out, errOut)
+	}
+}
+
+func TestStopHookBlocksEnforcedFailures(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+
+	code, out, errOut := runHookEvent(t, []check.Rule{failingRule("QK010", "docs.impact")}, "stop", "stop.json")
+
+	v := hookJSON(t, out)
+	if code != 0 || v["decision"] != "block" || !strings.Contains(fmt.Sprint(v["reason"]), "internal/x.go: docs/x.md must change too") {
+		t.Errorf("exit code = %d, stdout = %s, stderr = %q", code, out, errOut)
+	}
+}
+
+func TestStopHookEnforcedCleanIsSilent(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+	reg := []check.Rule{testRule("QK010", "docs.impact", check.Result{Status: check.Pass})}
+
+	code, out, errOut := runHookEvent(t, reg, "stop", "stop.json")
+
+	if code != 0 || out != "" || errOut != "" {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want silence", code, out, errOut)
+	}
+}
+
+func TestStopHookAllowsTheThirdBlockInARow(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+	reg := []check.Rule{failingRule("QK010", "docs.impact")}
+
+	for i, recording := range []string{"stop.json", "stop-active.json"} {
+		if _, out, _ := runHookEvent(t, reg, "stop", recording); hookJSON(t, out)["decision"] != "block" {
+			t.Fatalf("stop %d: stdout = %s, want a block", i+1, out)
+		}
+	}
+	code, out, errOut := runHookEvent(t, reg, "stop", "stop-active.json")
+
+	v := hookJSON(t, out)
+	if code != 0 || v["decision"] != nil || !strings.HasPrefix(fmt.Sprint(v["systemMessage"]), "Quality Kit: unresolved findings, handing over to a human") {
+		t.Errorf("third stop: exit code = %d, stdout = %s, stderr = %q", code, out, errOut)
+	}
+}
+
+func TestStopHookShowsChecksThatDidNotRun(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+	reg := []check.Rule{testRule("QK010", "docs.impact", check.Result{Status: check.Skipped, Reason: "rule crashed: boom"})}
+
+	code, out, errOut := runHookEvent(t, reg, "stop", "stop.json")
+
+	v := hookJSON(t, out)
+	if code != 0 || v["decision"] != nil || !strings.Contains(fmt.Sprint(v["systemMessage"]), "Skipped: QK010 (rule crashed: boom)") {
+		t.Errorf("exit code = %d, stdout = %s, stderr = %q", code, out, errOut)
+	}
+}
+
+func TestStopHookIsQuietWithoutAManifest(t *testing.T) {
+	// QK001 is always skipped without quality.yaml; saying so after every turn is noise.
+	inRepo(t, "")
+	t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+
+	code, out, errOut := runHookEvent(t, rules.All(), "stop", "stop.json")
+
+	if code != 0 || out != "" || errOut != "" {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want silence", code, out, errOut)
+	}
+}
+
+func TestHookErrorsNeverExitNonZero(t *testing.T) {
+	// Claude Code reads exit 2 as "block". A qk older than its hooks.json must not block.
+	tests := []struct {
+		name, stdin string
+		args        []string
+	}{
+		{"unknown hook", "{}", []string{"hook", "no-such-event"}},
+		{"unknown flag", "{}", []string{"hook", "stop", "--no-such-flag"}},
+		{"malformed stop input", "not json", []string{"hook", "stop"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inRepo(t, "version: 1\nmaturity: silver\n")
+			t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+			var out, errOut bytes.Buffer
+
+			code := run([]check.Rule{failingRule("QK010", "docs.impact")}, tt.args, strings.NewReader(tt.stdin), &out, &errOut)
+
+			if code != 0 || out.Len() != 0 || !strings.Contains(errOut.String(), "warning") {
+				t.Errorf("exit code = %d, stdout = %q, stderr = %q, want exit 0, no output and a warning", code, out.String(), errOut.String())
+			}
+		})
 	}
 }

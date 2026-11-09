@@ -25,6 +25,8 @@ qk version
 
 `qk version` must print the version in `plugin.json`, or the plugin ignores that binary. After a plugin update, install the matching `qk` again.
 
+A `qk` built from source between releases carries the same version, so build it from a commit that has every hook the plugin calls. See [work with the hooks](work-with-the-hooks.md#use-a-qk-you-installed-yourself).
+
 ## Requirements
 
 - macOS, Linux or Windows, on amd64 or arm64.

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -36,7 +37,18 @@ func main() {
 	os.Exit(run(rules.All(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-func run(reg []check.Rule, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func run(reg []check.Rule, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
+	// Hooks fail open. Claude Code reads exit 2 as "block", so anything that
+	// goes wrong in `qk hook`, even a hook this qk does not have, is a warning.
+	isHook := len(args) > 0 && args[0] == "hook"
+	if isHook {
+		defer func() {
+			if p := recover(); p != nil {
+				fmt.Fprintln(stderr, "qk: warning:", p)
+				code = 0
+			}
+		}()
+	}
 	root := newRootCmd(reg)
 	root.SetArgs(args)
 	root.SetIn(stdin)
@@ -45,6 +57,9 @@ func run(reg []check.Rule, args []string, stdin io.Reader, stdout, stderr io.Wri
 	err := root.Execute()
 	switch {
 	case err == nil:
+		return 0
+	case isHook:
+		fmt.Fprintln(stderr, "qk: warning:", err)
 		return 0
 	case errors.Is(err, errBlocking):
 		return 1
@@ -119,7 +134,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	})
 	root.AddCommand(newWaiverCmd(reg))
 	root.AddCommand(newDocsImpactCmd())
-	root.AddCommand(newHookCmd())
+	root.AddCommand(newHookCmd(reg))
 
 	root.AddCommand(&cobra.Command{
 		Use:   "explain <rule-id>",
@@ -210,30 +225,93 @@ func newWaiverCmd(reg []check.Rule) *cobra.Command {
 	return waiver
 }
 
-func newHookCmd() *cobra.Command {
-	h := &cobra.Command{Use: "hook", Short: "Entry points for Claude Code hooks", Hidden: true}
-	h.AddCommand(&cobra.Command{
-		Use:   "pre-tool-use",
-		Short: "Decide a PreToolUse hook from its JSON on stdin",
-		Args:  cobra.NoArgs,
+func newHookCmd(reg []check.Rule) *cobra.Command {
+	h := &cobra.Command{
+		Use: "hook", Short: "Entry points for Claude Code hooks", Hidden: true,
+		// Without RunE, cobra prints help to stdout for an unknown hook, and
+		// SessionStart would add that help to Claude's context.
+		RunE: func(_ *cobra.Command, args []string) error {
+			return fmt.Errorf("this qk (%s) has no hook %q", version, strings.Join(args, " "))
+		},
+	}
+	h.AddCommand(hookCmd("pre-tool-use", "Decide a PreToolUse hook from its JSON on stdin", func(input []byte) (any, error) {
+		out, err := hook.PreToolUse(input)
+		if out == nil {
+			return nil, err
+		}
+		return out, err
+	}))
+	h.AddCommand(hookCmd("session-start", "Add the session summary to Claude's context", func([]byte) (any, error) {
+		root, err := repoRoot()
+		if err != nil {
+			return nil, err
+		}
+		var summary strings.Builder
+		if err := check.WriteSessionSummary(&summary, reg, newContext(root, "")); err != nil {
+			return nil, err
+		}
+		return hook.SessionStart(summary.String()), nil
+	}))
+	h.AddCommand(hookCmd("stop", "Check what changed before Claude stops", func(input []byte) (any, error) {
+		root, err := repoRoot()
+		if err != nil {
+			return nil, err
+		}
+		ctx := newContext(root, "")
+		ctx.ChangedOnly = true
+		rep := check.Run(reg, check.ConfigFrom(ctx.Manifest), ctx)
+		var findings strings.Builder
+		if err := check.WriteReport(&findings, rep, "claude"); err != nil {
+			return nil, err
+		}
+		notify := rep.Summary.Warn > 0
+		for _, r := range rep.Results {
+			// Without quality.yaml, QK001 is always skipped: saying so after every turn is noise.
+			if r.Status == check.Skipped && (ctx.Manifest.Present || r.Rule != "QK001") {
+				notify = true
+			}
+		}
+		out, err := hook.Stop(input, hook.StopCheck{Blocking: rep.Blocking, Findings: findings.String(), Notify: notify}, hookStateDir())
+		if out == nil {
+			return nil, err
+		}
+		return out, err
+	}))
+	return h
+}
+
+// hookCmd reads a hook's JSON on stdin and writes decide's answer as JSON. A
+// nil answer writes nothing. Errors go to run, which makes them warnings.
+func hookCmd(use, short string, decide func(input []byte) (any, error)) *cobra.Command {
+	return &cobra.Command{
+		Use: use, Short: short, Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			input, err := io.ReadAll(cmd.InOrStdin())
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "qk: warning:", err)
-				return nil // hooks fail open
+				return err
 			}
-			out, err := hook.PreToolUse(input)
-			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "qk: warning:", err)
-				return nil
+			out, err := decide(input)
+			if err != nil || out == nil {
+				return err
 			}
-			if out == nil {
-				return nil
-			}
-			return json.NewEncoder(cmd.OutOrStdout()).Encode(out)
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			enc.SetEscapeHTML(false) // findings are read by people and Claude: keep <, > and & as written
+			return enc.Encode(out)
 		},
-	})
-	return h
+	}
+}
+
+// hookStateDir is where hooks keep state between calls: the plugin's data
+// directory, which survives plugin updates, or the user cache outside Claude Code.
+func hookStateDir() string {
+	if dir := os.Getenv("CLAUDE_PLUGIN_DATA"); dir != "" {
+		return dir
+	}
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return filepath.Join(os.TempDir(), "quality-kit")
+	}
+	return filepath.Join(dir, "quality-kit")
 }
 
 func newDocsImpactCmd() *cobra.Command {

@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -203,17 +204,31 @@ func archiveName() string {
 	return fmt.Sprintf("qk_%s_%s_%s.tar.gz", required, runtime.GOOS, runtime.GOARCH)
 }
 
+// run runs the shim with args, as a shell runs a path to a script.
 func (s *sandbox) run(stdin string, args ...string) (code int, stdout, stderr string) {
+	s.t.Helper()
+	if runtime.GOOS == "windows" {
+		return s.exec(stdin, gitBash, append([]string{s.shim()}, args...)...)
+	}
+	return s.exec(stdin, s.shim(), args...)
+}
+
+// runHook runs a hook command line the way Claude Code does: in Git Bash on
+// Windows, sh elsewhere, with ${CLAUDE_PLUGIN_ROOT} replaced by a forward-slash path.
+func (s *sandbox) runHook(stdin, command string) (code int, stdout, stderr string) {
+	s.t.Helper()
+	command = strings.ReplaceAll(command, "${CLAUDE_PLUGIN_ROOT}", filepath.ToSlash(s.root))
+	if runtime.GOOS == "windows" {
+		return s.exec(stdin, gitBash, "-c", command)
+	}
+	return s.exec(stdin, "sh", "-c", command)
+}
+
+func (s *sandbox) exec(stdin, name string, args ...string) (code int, stdout, stderr string) {
 	s.t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, gitBash, append([]string{s.shim()}, args...)...)
-	} else {
-		cmd = exec.CommandContext(ctx, s.shim(), args...)
-	}
+	cmd := exec.CommandContext(ctx, name, args...)
 
 	path := append([]string{s.tools}, s.onPath...)
 	if gitTools != "" {
@@ -504,6 +519,148 @@ func TestPassesStdinThrough(t *testing.T) {
 
 	if code != 0 || !strings.Contains(stdout, `"permissionDecision"`) {
 		t.Errorf("want a permission decision from the hook input; code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+// hookCommands reads plugins/quality-kit/hooks/hooks.json: the command for
+// each event, and the matcher of the hook that runs `qk hook <name>`.
+func hookCommands(t *testing.T) (commands, matchers map[string]string) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot, "plugins", "quality-kit", "hooks", "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &file); err != nil {
+		t.Fatal(err)
+	}
+	commands, matchers = map[string]string{}, map[string]string{}
+	for event, groups := range file.Hooks {
+		for _, g := range groups {
+			for _, h := range g.Hooks {
+				commands[event] = h.Command
+				if i := strings.Index(h.Command, " hook "); i >= 0 {
+					matchers[strings.TrimSpace(h.Command[i+len(" hook "):])] = g.Matcher
+				}
+			}
+		}
+	}
+	return commands, matchers
+}
+
+func recording(t *testing.T, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot, "internal", "hook", "testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+const waiverToolUse = `{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"qk waiver add QK010 --reason r --owner o --expires 2099-01-01 --approved-by a"}}`
+
+func TestHooksRunQK(t *testing.T) {
+	commands, _ := hookCommands(t)
+	tests := []struct{ event, input, want string }{
+		{"SessionStart", recording(t, "session-start.json"), `"additionalContext":"Quality Kit: no quality.yaml`},
+		{"PreToolUse", waiverToolUse, `"permissionDecision":"ask"`},
+		{"Stop", recording(t, "stop.json"), ""}, // no quality.yaml, nothing to say
+	}
+	for _, tt := range tests {
+		t.Run(tt.event, func(t *testing.T) {
+			s := newSandbox(t)
+			s.onPath = []string{filepath.Dir(requiredQK)}
+			s.data = filepath.Join(s.home, "plugin data")
+			if commands[tt.event] == "" {
+				t.Fatalf("hooks.json has no %s hook", tt.event)
+			}
+
+			code, stdout, stderr := s.runHook(tt.input, commands[tt.event])
+
+			if code != 0 || stderr != "" {
+				t.Errorf("exit code = %d, stderr = %q", code, stderr)
+			}
+			if tt.want == "" && stdout != "" || !strings.Contains(stdout, tt.want) {
+				t.Errorf("stdout = %q, want %q", stdout, tt.want)
+			}
+		})
+	}
+}
+
+func TestHooksFailOpenWithoutQK(t *testing.T) {
+	commands, _ := hookCommands(t)
+	for _, event := range []string{"PreToolUse", "Stop"} {
+		t.Run(event, func(t *testing.T) {
+			s := newSandbox(t)
+			s.fakeCurl("exit 6")
+
+			code, stdout, stderr := s.runHook(waiverToolUse, commands[event])
+
+			s.wantFailedOpen(code, stdout, stderr, "qk did not run")
+		})
+	}
+}
+
+func TestSessionStartTellsThePersonQKDidNotRun(t *testing.T) {
+	// Claude Code shows a hook's stderr only when it fails, so without this a
+	// repo with no qk looks clean. Once per session is enough: the other hooks stay quiet.
+	commands, _ := hookCommands(t)
+	s := newSandbox(t)
+	s.fakeCurl("exit 6")
+
+	code, stdout, stderr := s.runHook(recording(t, "session-start.json"), commands["SessionStart"])
+
+	var out struct {
+		SystemMessage string `json:"systemMessage"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%q", err, stdout)
+	}
+	if code != 0 || !strings.Contains(out.SystemMessage, "qk did not run") || !strings.Contains(stderr, "qk did not run") {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+}
+
+func TestSessionStartWarningSurvivesQuotesInPaths(t *testing.T) {
+	// The warning names the cache path, and a quote or backslash in it must not break the JSON.
+	if runtime.GOOS == "windows" {
+		t.Skip(`Windows paths cannot hold "`)
+	}
+	commands, _ := hookCommands(t)
+	s := newSandbox(t)
+	blocker := filepath.Join(s.home, "a file")
+	writeFile(t, blocker, nil, 0o644)
+	s.data = filepath.Join(blocker, `odd "data" \dir`) // cannot be created: its parent is a file
+
+	_, stdout, _ := s.runHook(recording(t, "session-start.json"), commands["SessionStart"])
+
+	var out struct {
+		SystemMessage string `json:"systemMessage"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil || !strings.Contains(out.SystemMessage, `odd "data" \dir`) {
+		t.Errorf("err = %v, stdout = %q", err, stdout)
+	}
+}
+
+func TestExceptionGuardCoversEveryWritingTool(t *testing.T) {
+	// A tool left out of the matcher is never checked, and nothing says so.
+	_, matchers := hookCommands(t)
+	matcher, ok := matchers["pre-tool-use"]
+	if !ok {
+		t.Fatal("hooks.json does not run qk hook pre-tool-use")
+	}
+	re := regexp.MustCompile("^(?:" + matcher + ")$")
+	for _, tool := range []string{"Bash", "PowerShell", "Edit", "Write", "NotebookEdit"} {
+		if !re.MatchString(tool) {
+			t.Errorf("matcher %q misses %s", matcher, tool)
+		}
 	}
 }
 
