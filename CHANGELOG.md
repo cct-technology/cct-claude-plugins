@@ -4,6 +4,8 @@
 
 ### Added
 
+- `bin/qk` in the plugin finds the `qk` binary its version needs: on `PATH`, in the cache, or by downloading the matching release and verifying its checksum. If none works it warns on stderr and exits 0.
+- Release pipeline: pushing a version tag publishes archives for darwin, linux and windows on amd64 and arm64, with `checksums.txt`. The release fails when the tag does not match `version` in `plugin.json`.
 - This repository checks itself: `quality.yaml` at silver, CODEOWNERS, and `qk check` on every pull request.
 - QK010 (`docs.impact`): when a changed file matches `paths` in `impact_map`, a file matching that entry's `docs` must change too. Enforced from silver.
 - `qk docs-impact none --reason --approved-by` records a person's approval that a branch's change needs no docs, in a note and in the exceptions log. A hand-written or later-edited note does not count.

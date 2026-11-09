@@ -14,6 +14,8 @@ docs:
       docs: ["docs/reference/manifest.md"]
     - paths: ["plugins/quality-kit/skills/**", "plugins/quality-kit/hooks/**"]
       docs: ["docs/how-to/**"]
+    - paths: ["plugins/quality-kit/bin/**", ".goreleaser.yaml"]
+      docs: ["docs/how-to/get-the-qk-binary.md", "docs/how-to/release-quality-kit.md"]
 generated:
   - file: docs/reference/rules.md
     cmd: go run ./cmd/gen-docs
