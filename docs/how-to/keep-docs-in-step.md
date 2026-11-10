@@ -39,3 +39,23 @@ This writes a note to `.quality/docs-impact/<branch>.md` and an approval line to
 - To change the reason, run the command again.
 
 To cover only some files, or to accept a finding for a set time, use a [waiver](waive-a-finding.md) instead.
+
+## Keep generated docs current
+
+List each file that a command generates, with that command:
+
+```yaml
+generated:
+  - file: docs/reference/settings.md
+    cmd: go run ./cmd/gen-settings-doc
+```
+
+QK020 runs each command from the repository root and fails when the file differs from what the command writes. Line endings do not count. The command runs without a shell and is split on spaces, so put pipes, redirects and quoted arguments in a script. Afterwards the working tree is put back as it was, uncommitted work included.
+
+Generators are slow, so QK020 runs only with `qk check --full` or in CI. Run it before you push:
+
+```sh
+qk check --full
+```
+
+When it fails, run the command it names and commit what it writes. Don't edit a generated file by hand.

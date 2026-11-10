@@ -22,8 +22,8 @@
 | `docs.impact_map[].paths` | list of strings; required | Globs for code paths, for example `internal/config/**`. |
 | `docs.impact_map[].docs` | list of strings; required | Globs for the docs that must change when those paths change. |
 | `generated` | list of objects | Files that must equal their generator's output (QK020). |
-| `generated[].file` | string; required | The generated file. |
-| `generated[].cmd` | string; required | The command that generates it, run from the repository root. |
+| `generated[].file` | string; required | The generated file, relative to the repository root. |
+| `generated[].cmd` | string; required | The command that writes the file, run from the repository root. It runs without a shell and is split on spaces, so put pipes, redirects and quoted arguments in a script. |
 | `contracts` | object | Contract files checked for breaking changes. |
 | `contracts.openapi` | list of strings | OpenAPI files (QK030). |
 | `contracts.asyncapi` | list of strings | AsyncAPI files (QK031). |

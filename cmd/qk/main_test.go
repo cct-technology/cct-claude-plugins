@@ -830,3 +830,47 @@ func TestHookErrorsNeverExitNonZero(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckFullFlag(t *testing.T) {
+	gitRepo(t)
+	t.Setenv("CI", "")
+	var got check.Context
+
+	if code, _, errOut := runQK(t, []check.Rule{recorder(&got)}, "check"); code != 0 || got.Full {
+		t.Errorf("without --full: exit code = %d, stderr = %q, Full = %v; want 0 and false", code, errOut, got.Full)
+	}
+	if code, _, errOut := runQK(t, []check.Rule{recorder(&got)}, "check", "--full"); code != 0 || !got.Full {
+		t.Errorf("with --full: exit code = %d, stderr = %q, Full = %v; want 0 and true", code, errOut, got.Full)
+	}
+}
+
+func TestCheckRunsSlowChecksInCI(t *testing.T) {
+	gitRepo(t)
+	t.Setenv("CI", "true")
+	var got check.Context
+
+	if code, _, errOut := runQK(t, []check.Rule{recorder(&got)}, "check"); code != 0 || !got.Full {
+		t.Errorf("exit code = %d, stderr = %q, Full = %v; want 0 and true", code, errOut, got.Full)
+	}
+}
+
+func TestCheckHelpExplainsFull(t *testing.T) {
+	code, out, _ := runQK(t, rules.All(), "check", "--help")
+
+	if code != 0 || !strings.Contains(out, "--full") || !strings.Contains(out, "QK020") || !strings.Contains(out, "CI") {
+		t.Errorf("exit code = %d, help = %s", code, out)
+	}
+}
+
+// Generators are too slow for every stop, even when Claude Code runs in a CI job.
+func TestStopHookLeavesOutSlowChecks(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\ngenerated:\n  - file: docs/api.md\n    cmd: make api-docs\n")
+	t.Setenv("CLAUDE_PLUGIN_DATA", t.TempDir())
+	t.Setenv("CI", "true")
+
+	code, out, errOut := runHookEvent(t, rules.All(), "stop", "stop.json")
+
+	if code != 0 || out != "" || errOut != "" {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want silence", code, out, errOut)
+	}
+}

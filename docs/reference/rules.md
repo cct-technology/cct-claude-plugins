@@ -26,6 +26,16 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 
 **How to fix.** Update the mapped docs. If this change needs none, ask a person to approve `qk docs-impact none --reason <why> --approved-by <person>`.
 
+## QK020 — Generated files equal their generator's output
+
+- Check key: `generated.current`
+- Phase: 1
+- Enforced by default at: silver, gold
+
+**What it checks.** Reference material is generated from code, never written by hand. For each entry under `generated` in `quality.yaml`, QK020 runs `cmd` from the repository root and compares `file` with what it wrote, ignoring line endings. A command shared by several entries runs once. Afterwards the working tree is put back as it was, uncommitted and untracked files included; ignored files are not restored. Generators are slow, so QK020 runs only with `qk check --full` or when the `CI` environment variable is `true`; otherwise it is skipped. A generator that fails is a finding with its output. One that is not installed is left out; if nothing else fails, the check is skipped and names it.
+
+**How to fix.** Run the command named in the finding and commit what it writes. Never edit a generated file by hand.
+
 ## QK100 — Waivers are valid, owned and not expired
 
 - Check key: `waivers.valid`
