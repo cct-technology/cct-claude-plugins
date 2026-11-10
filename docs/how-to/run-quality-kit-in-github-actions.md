@@ -33,6 +33,10 @@ Without the token, the job warns `could not download qk_...` and passes, and the
 - **A `quality-kit-sarif` artifact**: SARIF 2.1.0. Waived findings are results with a suppression that gives the waiver reason. Checks that did not run are notifications.
 - **A failed job when an enforced check fails**, or when the downloaded `qk` does not match `checksums.txt`, which may mean a tampered release. When `qk` cannot be downloaded or `qk check` cannot run, the job warns and passes, and the comment says why qk did not run. Check the comment as well as the status.
 
+## Generated files
+
+GitHub sets `CI=true`, so QK020 runs every command listed under `generated` in `quality.yaml`. The workflow installs only `qk`, so a generator gets only the tools on the runner. If yours needs more, such as installed dependencies, it fails, and from `silver` that fails the job. Then set `generated.current: advisory` under `modes`, and run `qk check --full` in a job of your own that sets the generator up.
+
 ## Show findings in code scanning
 
 ```yaml

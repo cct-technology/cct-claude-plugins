@@ -26,6 +26,14 @@ qk check --changed
 
 Checks that scan the whole repository then look only at the files changed against the base. The Stop hook runs `qk check --changed`.
 
+## Run the slow checks
+
+```sh
+qk check --full
+```
+
+This also runs the slow checks: QK020 runs every command listed under `generated`. They run without `--full` when the `CI` environment variable is `true`, which most CI services set. Otherwise they are skipped with that reason. The hooks never run them.
+
 ## Read the result
 
 - `--format text` (default) lists every check.

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,6 +93,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	var (
 		format, base string
 		changedOnly  bool
+		full         bool
 	)
 	checkCmd := &cobra.Command{
 		Use:   "check",
@@ -107,6 +109,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 			}
 			ctx := newContext(root, base)
 			ctx.ChangedOnly = changedOnly
+			ctx.Full = full || inCI()
 			if errors.Is(ctx.ChangesErr, changes.ErrBadBase) {
 				return ctx.ChangesErr // the user named a base that does not exist: usage error
 			}
@@ -128,6 +131,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	checkCmd.Flags().StringVar(&format, "format", "text", "output format: "+strings.Join(checkFormats, ", "))
 	checkCmd.Flags().StringVar(&base, "base", "", "compare against the merge-base with this ref (default: the default branch, from origin/HEAD, main or master)")
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
+	checkCmd.Flags().BoolVar(&full, "full", false, "also run slow checks: QK020 runs every generator (on by default when CI=true)")
 	root.AddCommand(checkCmd)
 	root.AddCommand(&cobra.Command{
 		Use:   "context",
@@ -167,6 +171,13 @@ func newContext(root, base string) check.Context {
 	ctx := check.Context{Root: root, Manifest: manifest.Load(root), Waivers: waivers.Load(root), Today: time.Now()}
 	ctx.Changes, ctx.ChangesErr = changes.Compute(root, base)
 	return ctx
+}
+
+// inCI reports whether the CI environment variable, which most CI services
+// set, says this is a CI run.
+func inCI() bool {
+	ci, _ := strconv.ParseBool(os.Getenv("CI"))
+	return ci
 }
 
 // repoRoot is the git top level, or the working directory outside git.
@@ -268,7 +279,7 @@ func newHookCmd(reg []check.Rule) *cobra.Command {
 		}
 		ctx := newContext(root, "")
 		ctx.ChangedOnly = true
-		rep := check.Run(reg, check.ConfigFrom(ctx.Manifest), ctx)
+		rep := check.Run(check.Fast(reg), check.ConfigFrom(ctx.Manifest), ctx)
 		var findings strings.Builder
 		if err := check.WriteReport(&findings, rep, "claude"); err != nil {
 			return nil, err

@@ -343,3 +343,99 @@ func TestBranch(t *testing.T) {
 		t.Errorf("detached Branch = %q, want a short form of %s", got, c)
 	}
 }
+
+func read(t *testing.T, dir, path string) (string, bool) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path)))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data), true
+}
+
+func TestRestoreWorktreeUndoesWhatACommandDid(t *testing.T) {
+	dir := newRepo(t, "main")
+	for _, p := range []string{"clean.txt", "edited.txt", "removed-later.txt", "removed-before.txt"} {
+		write(t, dir, p, "committed\n")
+	}
+	commit(t, dir, "base")
+	write(t, dir, "edited.txt", "uncommitted edit\n")
+	write(t, dir, "mine.txt", "untracked\n")
+	if err := os.Remove(filepath.Join(dir, "removed-before.txt")); err != nil {
+		t.Fatal(err)
+	}
+	before := run(t, dir, "status", "--porcelain", "--untracked-files=all")
+
+	saved, err := SaveWorktree(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// What a generator might do.
+	for _, p := range []string{"clean.txt", "edited.txt", "mine.txt", "removed-before.txt", "new/dir/new.txt"} {
+		write(t, dir, p, "generated\n")
+	}
+	if err := os.Remove(filepath.Join(dir, "removed-later.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := saved.Restore(); err != nil {
+		t.Fatal(err)
+	}
+
+	if after := run(t, dir, "status", "--porcelain", "--untracked-files=all"); after != before {
+		t.Errorf("git status after restore:\n%s\nwant:\n%s", after, before)
+	}
+	for path, want := range map[string]string{
+		"clean.txt":         "committed\n",
+		"edited.txt":        "uncommitted edit\n",
+		"mine.txt":          "untracked\n",
+		"removed-later.txt": "committed\n",
+	} {
+		if got, _ := read(t, dir, path); got != want {
+			t.Errorf("%s = %q, want %q", path, got, want)
+		}
+	}
+	for _, path := range []string{"removed-before.txt", "new/dir/new.txt"} {
+		if _, exists := read(t, dir, path); exists {
+			t.Errorf("%s exists after restore", path)
+		}
+	}
+}
+
+func TestSaveWorktreeOutsideGitFails(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+
+	if _, err := SaveWorktree(dir); err == nil {
+		t.Error("SaveWorktree outside git: no error")
+	}
+}
+
+// Paths are not globs: restoring web/app/[id]/page.tsx must not touch web/app/i/page.tsx.
+func TestRestoreWorktreeTakesPathsLiterally(t *testing.T) {
+	dir := newRepo(t, "main")
+	for _, p := range []string{"web/app/[id]/page.tsx", "web/app/i/page.tsx"} {
+		write(t, dir, p, "committed\n")
+	}
+	commit(t, dir, "base")
+	write(t, dir, "web/app/i/page.tsx", "uncommitted edit\n")
+
+	saved, err := SaveWorktree(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "web/app/[id]/page.tsx", "generated\n")
+	if err := saved.Restore(); err != nil {
+		t.Fatal(err)
+	}
+
+	for path, want := range map[string]string{"web/app/[id]/page.tsx": "committed\n", "web/app/i/page.tsx": "uncommitted edit\n"} {
+		if got, _ := read(t, dir, path); got != want {
+			t.Errorf("%s = %q, want %q", path, got, want)
+		}
+	}
+}

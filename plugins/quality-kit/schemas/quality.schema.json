@@ -78,8 +78,8 @@
         "additionalProperties": false,
         "required": ["file", "cmd"],
         "properties": {
-          "file": { "description": "The generated file.", "type": "string", "minLength": 1 },
-          "cmd": { "description": "The command that generates it, run from the repository root.", "type": "string", "minLength": 1 }
+          "file": { "description": "The generated file, relative to the repository root.", "type": "string", "minLength": 1 },
+          "cmd": { "description": "The command that writes the file, run from the repository root. It runs without a shell and is split on spaces, so put pipes, redirects and quoted arguments in a script.", "type": "string", "minLength": 1 }
         }
       }
     },

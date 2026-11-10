@@ -16,8 +16,14 @@ const (
 )
 
 // slowRules use the network or a long scan. Named here, not on the rule, so
-// they stay out of the session-start summary from the day they are registered.
+// they stay out of the session-start summary and the Stop hook from the day
+// they are registered.
 var slowRules = []string{"QK020", "QK060"}
+
+// Fast leaves out the slow rules, for hooks that run on every turn.
+func Fast(rules []Rule) []Rule {
+	return slices.DeleteFunc(slices.Clone(rules), func(r Rule) bool { return slices.Contains(slowRules, r.ID) })
+}
 
 // WriteSessionSummary writes what `qk context` prints: maturity and modes, open
 // findings per rule, and waivers about to end. Skipped checks and slow rules

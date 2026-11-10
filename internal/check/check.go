@@ -67,6 +67,7 @@ type Context struct {
 	Changes     *changes.Set    // what changed against the base; nil when ChangesErr is set
 	ChangesErr  error           // why there is no change set: rules that need one skip with it as reason
 	ChangedOnly bool            // --changed: checks that scan the whole repo look only at changed files
+	Full        bool            // --full or CI: slow checks such as QK020 run instead of skipping
 	Waivers     waivers.Loaded  // .quality/waivers.yaml, if any
 	Today       time.Time       // the day waivers are judged against
 }
