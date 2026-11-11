@@ -34,6 +34,13 @@ qk check --full
 
 This also runs the slow checks: QK020 runs every command listed under `generated`. They run without `--full` when the `CI` environment variable is `true`, which most CI services set. Otherwise they are skipped with that reason. The hooks never run them.
 
+> [!WARNING]
+> Do not edit files while `qk check --full` runs, and do not let Claude edit them.
+>
+> - Afterwards QK020 puts every file listed under `generated` back as it was before the run, so an edit to one of those files during the run is lost.
+> - Changes to any other file are kept. qk cannot tell them from a change the generator made, so QK020 leaves the file as it is and warns, naming it.
+> - If such a file had uncommitted changes before the run, the warning gives a `git cat-file -p` command that prints what the file held then. Recover it soon: git may delete that copy after about two weeks.
+
 ## Read the result
 
 - `--format text` (default) lists every check.
