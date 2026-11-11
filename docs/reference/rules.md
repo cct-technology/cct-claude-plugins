@@ -32,9 +32,9 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 - Phase: 1
 - Enforced by default at: silver, gold
 
-**What it checks.** Reference material is generated from code, never written by hand. For each entry under `generated` in `quality.yaml`, QK020 runs `cmd` from the repository root and compares `file` with what it wrote, ignoring line endings. A command shared by several entries runs once. Afterwards the working tree is put back as it was, uncommitted and untracked files included; ignored files are not restored. Generators are slow, so QK020 runs only with `qk check --full` or when the `CI` environment variable is `true`; otherwise it is skipped. A generator that fails is a finding with its output. One that is not installed is left out; if nothing else fails, the check is skipped and names it.
+**What it checks.** Reference material is generated from code, never written by hand. For each entry under `generated` in `quality.yaml`, QK020 runs `cmd` from the repository root and compares `file` with what it wrote, ignoring line endings. A command shared by several entries runs once. Afterwards the files under `generated` are put back as they were, uncommitted changes included. Any other file that changed while the command ran is left as it is, with a warning naming it: qk cannot tell the command's changes from a person's. What such a file held before, if git did not have it, is kept as a git blob the warning names. Ignored files are not restored. Generators are slow, so QK020 runs only with `qk check --full` or when the `CI` environment variable is `true`; otherwise it is skipped. A generator that fails is a finding with its output. One that is not installed is left out; if nothing else fails, the check is skipped and names it.
 
-**How to fix.** Run the command named in the finding and commit what it writes. Never edit a generated file by hand.
+**How to fix.** Run the command named in the finding and commit what it writes. Never edit a generated file by hand. For a warning about a file outside `generated`: if the command writes it, list it under `generated`.
 
 ## QK100 — Waivers are valid, owned and not expired
 

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -374,15 +375,20 @@ func TestRestoreWorktreeUndoesWhatACommandDid(t *testing.T) {
 		t.Fatal(err)
 	}
 	// What a generator might do.
-	for _, p := range []string{"clean.txt", "edited.txt", "mine.txt", "removed-before.txt", "new/dir/new.txt"} {
+	written := []string{"clean.txt", "edited.txt", "mine.txt", "removed-before.txt", "new/dir/new.txt"}
+	for _, p := range written {
 		write(t, dir, p, "generated\n")
 	}
 	if err := os.Remove(filepath.Join(dir, "removed-later.txt")); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := saved.Restore(); err != nil {
+	left, err := saved.Restore(append(written, "removed-later.txt")...)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(left) > 0 {
+		t.Errorf("left = %+v, want every file restored", left)
 	}
 
 	if after := run(t, dir, "status", "--porcelain", "--untracked-files=all"); after != before {
@@ -401,6 +407,74 @@ func TestRestoreWorktreeUndoesWhatACommandDid(t *testing.T) {
 	for _, path := range []string{"removed-before.txt", "new/dir/new.txt"} {
 		if _, exists := read(t, dir, path); exists {
 			t.Errorf("%s exists after restore", path)
+		}
+	}
+}
+
+// Restore cannot tell a generator's writes from an edit made meanwhile, so it
+// puts back only the files it is given. Every other change stays and is named,
+// and what such a file held before is kept in git.
+func TestRestoreLeavesOtherChangesAndNamesThem(t *testing.T) {
+	dir := newRepo(t, "main")
+	for _, p := range []string{"listed.txt", "clean.txt", "edited.txt", "untouched.txt", "reverted.txt", "removed.txt"} {
+		write(t, dir, p, "committed\n")
+	}
+	commit(t, dir, "base")
+	write(t, dir, "edited.txt", "uncommitted edit\n")
+	write(t, dir, "untouched.txt", "uncommitted edit\n")
+	write(t, dir, "reverted.txt", "uncommitted edit\n")
+	write(t, dir, "mine.txt", "untracked\n")
+
+	saved, err := SaveWorktree(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// While the command runs, it or someone else changes these.
+	for _, p := range []string{"listed.txt", "clean.txt", "edited.txt", "new.txt"} {
+		write(t, dir, p, "meanwhile\n")
+	}
+	write(t, dir, "reverted.txt", "committed\n")
+	for _, p := range []string{"mine.txt", "removed.txt"} {
+		if err := os.Remove(filepath.Join(dir, p)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	left, err := saved.Restore("./listed.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var paths []string
+	for _, l := range left {
+		paths = append(paths, l.Path)
+	}
+	if want := []string{"clean.txt", "edited.txt", "mine.txt", "new.txt", "removed.txt", "reverted.txt"}; !slices.Equal(paths, want) {
+		t.Fatalf("left = %v, want %v", paths, want)
+	}
+	for _, l := range left {
+		want := map[string]string{"edited.txt": "uncommitted edit\n", "mine.txt": "untracked\n", "reverted.txt": "uncommitted edit\n"}[l.Path]
+		if want == "" {
+			if l.Before != "" {
+				t.Errorf("%s: Before = %q, want none: git has what it held", l.Path, l.Before)
+			}
+			continue
+		}
+		if got := run(t, dir, "cat-file", "-p", l.Before); got != strings.TrimSpace(want) { // run trims
+			t.Errorf("%s: blob %q holds %q, want %q", l.Path, l.Before, got, want)
+		}
+	}
+	for path, want := range map[string]string{
+		"listed.txt": "committed\n", "clean.txt": "meanwhile\n", "edited.txt": "meanwhile\n",
+		"untouched.txt": "uncommitted edit\n", "reverted.txt": "committed\n", "new.txt": "meanwhile\n",
+	} {
+		if got, _ := read(t, dir, path); got != want {
+			t.Errorf("%s = %q, want %q", path, got, want)
+		}
+	}
+	for _, path := range []string{"mine.txt", "removed.txt"} {
+		if _, exists := read(t, dir, path); exists {
+			t.Errorf("%s exists after restore, want it left deleted", path)
 		}
 	}
 }
@@ -429,7 +503,7 @@ func TestRestoreWorktreeTakesPathsLiterally(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, dir, "web/app/[id]/page.tsx", "generated\n")
-	if err := saved.Restore(); err != nil {
+	if _, err := saved.Restore("web/app/[id]/page.tsx"); err != nil {
 		t.Fatal(err)
 	}
 

@@ -50,12 +50,14 @@ generated:
     cmd: go run ./cmd/gen-settings-doc
 ```
 
-QK020 runs each command from the repository root and fails when the file differs from what the command writes. Line endings do not count. The command runs without a shell and is split on spaces, so put pipes, redirects and quoted arguments in a script. Afterwards the working tree is put back as it was, uncommitted work included.
+QK020 runs each command from the repository root and fails when the file differs from what the command writes. Line endings do not count. The command runs without a shell and is split on spaces, so put pipes, redirects and quoted arguments in a script. Afterwards the files under `generated` are put back as they were, uncommitted changes included. Any other file that changed during the run is left as it is, and QK020 warns about it: if the command writes that file, list it under `generated`.
 
 Generators are slow, so QK020 runs only with `qk check --full` or in CI. Run it before you push:
 
 ```sh
 qk check --full
 ```
+
+Leave the files alone while it runs: an edit made during the run can be lost. See [run the slow checks](run-qk-check.md#run-the-slow-checks).
 
 When it fails, run the command it names and commit what it writes. Don't edit a generated file by hand.

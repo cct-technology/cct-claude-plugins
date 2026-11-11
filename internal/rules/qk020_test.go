@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -165,7 +166,7 @@ func TestQK020FailsWhenTheFileDiffersAndPutsItBack(t *testing.T) {
 
 func TestQK020FailsWhenTheGeneratorDoesNotWriteAMissingFile(t *testing.T) {
 	ctx := qk020Repo(t, map[string]string{"README.md": "x\n"},
-		manifest.Generated{File: "docs/api.md", Cmd: generator(t, "docs/other.md=fresh")})
+		manifest.Generated{File: "docs/api.md", Cmd: generator(t, "")})
 
 	res := runRegisteredQK020(t, ctx)
 
@@ -206,10 +207,10 @@ func TestQK020RunsEachCommandOnceForAllItsFiles(t *testing.T) {
 	}
 }
 
-// Uncommitted work survives the check, and so does everything else the generator touched.
+// Uncommitted work survives the check.
 func TestQK020LeavesTheWorkingTreeAsItWas(t *testing.T) {
-	ctx := qk020Repo(t, map[string]string{"docs/api.md": "stale\n", "src/main.go": "package main\n", "notes.txt": "committed\n"},
-		manifest.Generated{File: "docs/api.md", Cmd: generator(t, "docs/api.md=fresh notes.txt=junk build/out.txt=junk")})
+	ctx := qk020Repo(t, map[string]string{"docs/api.md": "stale\n", "src/main.go": "package main\n"},
+		manifest.Generated{File: "./docs/api.md", Cmd: generator(t, "docs/api.md=fresh")})
 	put(t, ctx.Root, "docs/api.md", "fresh\n") // regenerated, not yet committed
 	put(t, ctx.Root, "src/main.go", "package main // edited\n")
 	put(t, ctx.Root, "scratch.txt", "mine\n")
@@ -223,9 +224,44 @@ func TestQK020LeavesTheWorkingTreeAsItWas(t *testing.T) {
 	if after := status(t, ctx.Root); after != before {
 		t.Errorf("git status after the check:\n%s\nwant:\n%s", after, before)
 	}
-	for path, want := range map[string]string{
-		"docs/api.md": "fresh\n", "src/main.go": "package main // edited\n", "scratch.txt": "mine\n", "notes.txt": "committed\n",
-	} {
+	for path, want := range map[string]string{"docs/api.md": "fresh\n", "src/main.go": "package main // edited\n", "scratch.txt": "mine\n"} {
+		if got := content(t, ctx.Root, path); got != want {
+			t.Errorf("%s = %q, want %q", path, got, want)
+		}
+	}
+}
+
+// A file outside `generated` that changed during the run may hold someone's
+// edit, so QK020 leaves it and warns, keeping what it held before in git.
+func TestQK020LeavesOtherFilesThatChangedAndNamesThem(t *testing.T) {
+	cmd := generator(t, "docs/api.md=fresh notes.txt=junk build/out.txt=junk src/main.go=junk")
+	ctx := qk020Repo(t, map[string]string{"docs/api.md": "fresh\n", "src/main.go": "package main\n", "notes.txt": "committed\n"},
+		manifest.Generated{File: "docs/api.md", Cmd: cmd})
+	put(t, ctx.Root, "src/main.go", "package main // edited\n")
+
+	res := runRegisteredQK020(t, ctx)
+
+	if res.Status != check.Warn {
+		t.Fatalf("result = %+v, want warn: nothing generated is stale", res)
+	}
+	var files []string
+	for _, f := range res.Findings {
+		files = append(files, f.File)
+		if !strings.Contains(f.Message, "`"+cmd+"`") || !strings.Contains(f.Message, "`generated`") {
+			t.Errorf("%s: message %q does not name the command and `generated`", f.File, f.Message)
+		}
+	}
+	if want := "build/out.txt notes.txt src/main.go"; strings.Join(files, " ") != want {
+		t.Fatalf("findings on %v, want %s", files, want)
+	}
+	blob := regexp.MustCompile("git cat-file -p ([0-9a-f]+)").FindStringSubmatch(res.Findings[2].Message)
+	if blob == nil {
+		t.Fatalf("src/main.go: message %q does not say where its uncommitted edit is", res.Findings[2].Message)
+	}
+	if got := gitIn(t, ctx.Root, "cat-file", "-p", blob[1]); got != "package main // edited\n" {
+		t.Errorf("kept blob = %q, want the uncommitted edit", got)
+	}
+	for path, want := range map[string]string{"docs/api.md": "fresh\n", "notes.txt": "junk\n", "build/out.txt": "junk\n", "src/main.go": "junk\n"} {
 		if got := content(t, ctx.Root, path); got != want {
 			t.Errorf("%s = %q, want %q", path, got, want)
 		}
@@ -258,6 +294,23 @@ func TestQK020RunsOnlyWhenAskedForSlowChecks(t *testing.T) {
 func TestQK020PassesWithoutGeneratedFiles(t *testing.T) {
 	if res := runRegisteredQK020(t, check.Context{}); res.Status != check.Pass {
 		t.Errorf("result = %+v, want pass", res)
+	}
+}
+
+// A file under `generated` is put back whichever command wrote it, and is never
+// reported as missing from `generated`.
+func TestQK020PutsBackAFileAnotherCommandWrote(t *testing.T) {
+	ctx := qk020Repo(t, map[string]string{"docs/a.md": "a\n", "docs/b.md": "b\n"},
+		manifest.Generated{File: "docs/a.md", Cmd: generator(t, "docs/a.md=a")},
+		manifest.Generated{File: "docs/b.md", Cmd: generator(t, "docs/b.md=b docs/a.md=overwritten")})
+
+	res := runRegisteredQK020(t, ctx)
+
+	if res.Status != check.Pass {
+		t.Errorf("result = %+v, want pass", res)
+	}
+	if got := content(t, ctx.Root, "docs/a.md"); got != "a\n" {
+		t.Errorf("docs/a.md = %q after the check, want it as committed", got)
 	}
 }
 

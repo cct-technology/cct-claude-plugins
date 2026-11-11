@@ -3,9 +3,13 @@ package changes
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -50,36 +54,90 @@ func SaveWorktree(root string) (*Worktree, error) {
 	return w, nil
 }
 
-// Restore puts the working tree back as it was saved. Saved files get their
-// content back, files that did not exist are removed, new untracked files are
-// deleted, and tracked files that were unchanged are checked out from the index.
+// Left is a file Restore left as it is now, although it changed after the tree was saved.
+type Left struct {
+	Path   string // slash path
+	Before string // git blob holding what the file held when saved; "" when git already has that
+}
+
+// Restore puts back paths as they were saved: saved files get their content
+// back, files that did not exist are removed, and files that matched the index
+// are checked out from it. Any other file that changed since the save is left
+// alone and returned, since Restore cannot tell who changed it; what it held
+// then, when git does not have it, is written to git as a blob.
 // ponytail: empty folders a command created stay; git does not see them.
-func (w *Worktree) Restore() error {
+func (w *Worktree) Restore(paths ...string) ([]Left, error) {
 	now, untracked, err := worktreeStatus(w.root)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	restore := map[string]bool{}
+	for _, p := range paths {
+		restore[path.Clean(filepath.ToSlash(p))] = true
 	}
 	var errs []error
 	var fromIndex []string
+	var left []Left
+	leave := func(p string, s savedFile, saved bool) {
+		l := Left{Path: p}
+		if saved && s.exists {
+			blob, err := keep(w.root, s.data)
+			l.Before = blob
+			errs = append(errs, err)
+		}
+		left = append(left, l)
+	}
+	inStatus := map[string]bool{}
 	for _, p := range now {
-		switch _, saved := w.files[p]; {
-		case saved:
-		case untracked[p]:
+		inStatus[p] = true
+		s, saved := w.files[p]
+		switch {
+		case restore[p] && saved: // written back below
+		case restore[p] && untracked[p]:
 			errs = append(errs, removeIfExists(filepath.Join(w.root, filepath.FromSlash(p))))
-		default:
+		case restore[p]:
 			fromIndex = append(fromIndex, p)
+		case !saved || !s.matches(filepath.Join(w.root, filepath.FromSlash(p))):
+			leave(p, s, saved)
+		}
+	}
+	for p, s := range w.files {
+		if !inStatus[p] && !restore[p] { // changed before the save, matches the index now
+			leave(p, s, true)
 		}
 	}
 	if len(fromIndex) > 0 {
 		// Literal: a path like web/app/[id]/page.tsx is not a glob. Saved files are written after, so nothing overwrites them.
-		// ponytail: one command line; split it if a generator ever touches thousands of files.
+		// ponytail: one command line; split it if a generator ever writes thousands of listed files.
 		_, err := git(w.root, append([]string{"--literal-pathspecs", "checkout", "--"}, fromIndex...)...)
 		errs = append(errs, err)
 	}
-	for p, s := range w.files {
-		errs = append(errs, s.restore(filepath.Join(w.root, filepath.FromSlash(p))))
+	for p := range restore {
+		if s, saved := w.files[p]; saved {
+			errs = append(errs, s.restore(filepath.Join(w.root, filepath.FromSlash(p))))
+		}
 	}
-	return errors.Join(errs...)
+	slices.SortFunc(left, func(a, b Left) int { return strings.Compare(a.Path, b.Path) })
+	return left, errors.Join(errs...)
+}
+
+// keep writes data to git as a blob, unchanged, and returns its id.
+func keep(root string, data []byte) (string, error) {
+	cmd := exec.Command("git", "-C", root, "hash-object", "-w", "--no-filters", "--stdin")
+	cmd.Stdin = bytes.NewReader(data)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git hash-object: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func (s savedFile) matches(full string) bool {
+	now, err := os.ReadFile(full)
+	if errors.Is(err, fs.ErrNotExist) {
+		return !s.exists
+	}
+	return err == nil && s.exists && bytes.Equal(now, s.data)
 }
 
 func (s savedFile) restore(full string) error {
