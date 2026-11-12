@@ -34,11 +34,7 @@ func runQK010(ctx check.Context) check.Result {
 		return check.Result{Status: check.Pass}
 	}
 	if ctx.Changes == nil {
-		reason := "no change set"
-		if ctx.ChangesErr != nil {
-			reason = ctx.ChangesErr.Error()
-		}
-		return check.Result{Status: check.Skipped, Reason: reason}
+		return noChangeSet(ctx)
 	}
 
 	findings := missingDocs(entries, ctx.Changes.Files)

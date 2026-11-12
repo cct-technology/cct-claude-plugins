@@ -32,7 +32,12 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go vet ./...
+      # QK030's tests run the real oasdiff. A version, not @latest: a new release
+      # must not change what this job tests.
+      - run: go install github.com/oasdiff/oasdiff@v1.35.0
       - run: go test ./...
+        env:
+          QK_REQUIRE_OASDIFF: "1" # those tests fail, not skip, when oasdiff is missing
       - name: Generated reference docs are current
         if: runner.os == 'Linux'
         run: |

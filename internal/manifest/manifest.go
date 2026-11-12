@@ -39,6 +39,12 @@ type Manifest struct {
 	Modes     map[string]string `yaml:"modes"`
 	Docs      Docs              `yaml:"docs"`
 	Generated []Generated       `yaml:"generated"`
+	Contracts Contracts         `yaml:"contracts"`
+}
+
+// Contracts lists the contract files checked for breaking changes, as globs.
+type Contracts struct {
+	OpenAPI []string `yaml:"openapi"` // QK030
 }
 
 // Docs is the docs section of the manifest.

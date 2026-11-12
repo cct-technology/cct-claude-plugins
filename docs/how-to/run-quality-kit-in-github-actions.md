@@ -37,6 +37,10 @@ Without the token, the job warns `could not download qk_...` and passes, and the
 
 GitHub sets `CI=true`, so QK020 runs every command listed under `generated` in `quality.yaml`. The workflow installs only `qk`, so a generator gets only the tools on the runner. If yours needs more, such as installed dependencies, it fails, and from `silver` that fails the job. Then set `generated.current: advisory` under `modes`, and run `qk check --full` in a job of your own that sets the generator up.
 
+## OpenAPI contracts
+
+The workflow does not install `oasdiff`, so QK030 is skipped in this job and the comment says so. To have [breaking API changes](catch-breaking-api-changes.md) block a pull request, run `qk check` in a job of your own that installs `oasdiff` first.
+
 ## Show findings in code scanning
 
 ```yaml
