@@ -12,6 +12,16 @@ func All() []check.Rule {
 		qk001(),
 		qk010(),
 		qk020(),
+		qk030(),
 		qk100(),
 	}
+}
+
+// noChangeSet is what a rule that needs the change set returns when there is none.
+func noChangeSet(ctx check.Context) check.Result {
+	reason := "no change set"
+	if ctx.ChangesErr != nil {
+		reason = ctx.ChangesErr.Error()
+	}
+	return check.Result{Status: check.Skipped, Reason: reason}
 }

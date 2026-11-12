@@ -36,6 +36,16 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 
 **How to fix.** Run the command named in the finding and commit what it writes. Never edit a generated file by hand. For a warning about a file outside `generated`: if the command writes it, list it under `generated`.
 
+## QK030 — No breaking OpenAPI changes
+
+- Check key: `contracts.breaking`
+- Phase: 1
+- Enforced by default at: silver, gold
+
+**What it checks.** A breaking API change should be caught before it merges, not by the clients it breaks. For each changed file matching `contracts.openapi` in `quality.yaml`, QK030 runs `oasdiff breaking` on its version at the base and its version now. Each change that breaks clients is a finding. A change oasdiff cannot confirm as breaking, such as a removed request parameter, is a warning marked `possibly breaking`. A deleted contract fails. A new one passes. A renamed one is compared with what it held under its old name. Only the listed file starts a comparison: a change in a file it reaches through `$ref` is seen when the listed file changes too. When `oasdiff` is not installed, or cannot read a contract, the check is skipped and says why.
+
+**How to fix.** Keep the API compatible: put back what was removed, or make the new requirement optional. If the break is intended, release it as a new API version, or ask a person to approve a waiver with `qk waiver add QK030`.
+
 ## QK100 — Waivers are valid, owned and not expired
 
 - Check key: `waivers.valid`

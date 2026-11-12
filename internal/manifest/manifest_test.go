@@ -46,6 +46,9 @@ func TestLoadValidManifestUsingEveryKey(t *testing.T) {
 	if !reflect.DeepEqual(l.Manifest.Generated, wantGenerated) {
 		t.Errorf("generated = %+v, want %+v", l.Manifest.Generated, wantGenerated)
 	}
+	if want := []string{"api/openapi.yaml"}; !reflect.DeepEqual(l.Manifest.Contracts.OpenAPI, want) {
+		t.Errorf("contracts.openapi = %v, want %v", l.Manifest.Contracts.OpenAPI, want)
+	}
 }
 
 func TestGeneratorNamesTheCommandForAGeneratedFile(t *testing.T) {
