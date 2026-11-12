@@ -31,15 +31,48 @@ Without the token, the job warns `could not download qk_...` and passes, and the
 - **A comment on the pull request**, edited on every push: failures and warnings with how to fix them, waived findings, and checks that did not run. Pull requests from forks get no comment, because their token cannot write.
 - **The same text in the job summary.**
 - **A `quality-kit-sarif` artifact**: SARIF 2.1.0. Waived findings are results with a suppression that gives the waiver reason. Checks that did not run are notifications.
-- **A failed job when an enforced check fails**, or when the downloaded `qk` does not match `checksums.txt`, which may mean a tampered release. When `qk` cannot be downloaded or `qk check` cannot run, the job warns and passes, and the comment says why qk did not run. Check the comment as well as the status.
+- **A failed job when an enforced check fails**, when a [`setup`](#set-up-what-the-checks-need) command fails, or when the downloaded `qk` does not match `checksums.txt`, which may mean a tampered release. When `qk` cannot be downloaded or `qk check` cannot run, the job warns and passes, and the comment says why qk did not run. Check the comment as well as the status.
 
-## Generated files
+## Set up what the checks need
 
-GitHub sets `CI=true`, so QK020 runs every command listed under `generated` in `quality.yaml`. The workflow installs only `qk`, so a generator gets only the tools on the runner. If yours needs more, such as installed dependencies, it fails, and from `silver` that fails the job. Then set `generated.current: advisory` under `modes`, and run `qk check --full` in a job of your own that sets the generator up.
+The workflow installs only `qk`. Two checks run other tools: QK020 runs every command listed under `generated` in `quality.yaml`, and QK030 runs `oasdiff`. Give the job those tools with `setup`: shell commands that run in the root of your repository before `qk check`.
 
-## OpenAPI contracts
+```yaml
+    uses: rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
+    with:
+      setup: |
+        npm ci
+```
 
-The workflow does not install `oasdiff`, so QK030 is skipped in this job and the comment says so. To have [breaking API changes](catch-breaking-api-changes.md) block a pull request, run `qk check` in a job of your own that installs `oasdiff` first.
+- **The commands run with `bash -eo pipefail`.** The first one that fails stops the setup and fails the job. The comment then says qk did not run.
+- **The job runs on `ubuntu-latest`**, with the toolchains GitHub installs there.
+- **To put a tool on `PATH` for `qk check`**, add its folder to `$GITHUB_PATH`.
+- **Keep new files out of the checkout**, unless git ignores them: qk counts a new file there as a change. Use `$RUNNER_TEMP`.
+- **`setup` cannot use actions** such as `actions/setup-node`. If you need one, run `qk check` in a job of your own.
+
+### Generated files
+
+GitHub sets `CI=true`, so QK020 runs your generators. A generator whose tool is missing is skipped. One that runs and fails, for example because its dependencies are not installed, is a finding, and from `silver` that fails the job. Install what it needs in `setup`.
+
+When `setup` cannot do that, set `generated.current: advisory` under `modes`, and run `qk check --full` in a job of your own that sets the generator up.
+
+### OpenAPI contracts
+
+Without `oasdiff`, QK030 is skipped and the comment says so. To have [breaking API changes](catch-breaking-api-changes.md) block a pull request, install it:
+
+```yaml
+    with:
+      setup: |
+        v=1.35.0
+        release="https://github.com/oasdiff/oasdiff/releases/download/v$v"
+        mkdir -p "$RUNNER_TEMP/oasdiff" && cd "$RUNNER_TEMP/oasdiff"
+        curl -fsSL -O "$release/oasdiff_${v}_linux_amd64.tar.gz" -O "$release/checksums.txt"
+        grep " oasdiff_${v}_linux_amd64.tar.gz$" checksums.txt | sha256sum -c -
+        tar -xzf "oasdiff_${v}_linux_amd64.tar.gz" oasdiff
+        echo "$PWD" >> "$GITHUB_PATH"
+```
+
+This repository's own CI does the same.
 
 ## Show findings in code scanning
 
