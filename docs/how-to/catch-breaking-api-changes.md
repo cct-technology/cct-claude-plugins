@@ -25,7 +25,7 @@ go install github.com/oasdiff/oasdiff@latest
 
 Other ways to install it are in the [oasdiff README](https://github.com/oasdiff/oasdiff#installation). Use version 1.12 or newer: QK030 asks oasdiff to read the base version from git.
 
-Without `oasdiff` on `PATH`, QK030 is skipped and says so. A skipped check never blocks, so install oasdiff wherever the check should count, CI included.
+Without `oasdiff` on `PATH`, QK030 is skipped and says so. A skipped check never blocks, so install oasdiff wherever the check should count, CI included. For the GitHub Actions workflow, see [OpenAPI contracts](run-quality-kit-in-github-actions.md#openapi-contracts).
 
 ## Read the result
 

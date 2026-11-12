@@ -8,9 +8,9 @@
 #
 # It runs qk check against the base branch, keeps the SARIF as an artifact
 # (and in code scanning when asked), and keeps one comment on the pull
-# request up to date. The job fails when an enforced check fails, or when the
-# downloaded qk does not match its checksum. Any other problem with Quality
-# Kit itself is a warning, as in the hooks.
+# request up to date. The job fails when an enforced check fails, when the
+# downloaded qk does not match its checksum, or when a `setup` command fails.
+# Any other problem with Quality Kit itself is a warning, as in the hooks.
 # See docs/how-to/run-quality-kit-in-github-actions.md.
 name: Quality Kit
 
@@ -29,6 +29,10 @@ on:
         description: Build qk from the checked-out repository instead of installing a release. Only for the Quality Kit repository itself.
         type: boolean
         default: false
+      setup:
+        description: Shell commands to run in the repository root before qk check, so generators (QK020) and oasdiff (QK030) have what they need. A command that fails fails the job.
+        type: string
+        default: ""
     secrets:
       QK_RELEASE_TOKEN:
         description: A token that can read the releases of rkvalvaa/cct-claude-plugins. Needed while that repository is private.
@@ -91,6 +95,16 @@ jobs:
           mkdir -p "$RUNNER_TEMP/qk"
           go build -o "$RUNNER_TEMP/qk/qk" ./cmd/qk
           echo "$RUNNER_TEMP/qk" >> "$GITHUB_PATH"
+
+      - name: Set up what the checks need
+        if: inputs.setup != ''
+        env:
+          SETUP: ${{ inputs.setup }} # only here: written into `run:` it would become part of this script
+        run: |
+          bash -eo pipefail -c "$SETUP" || {
+            echo "qk did not run: a setup command failed. See the workflow log." > "$RUNNER_TEMP/qk-summary.txt"
+            exit 1
+          }
 
       - name: qk check
         id: check
