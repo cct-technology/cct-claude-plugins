@@ -75,3 +75,13 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 **What it checks.** A waiver in `.quality/waivers.yaml` needs a reason, an owner and an end date, so an exception cannot quietly become permanent. It also needs a matching approval in `.quality/exceptions-log.jsonl`, written by `qk waiver add`, so a hand-written or later-edited waiver does not count. An expired, incomplete or unapproved waiver never applies: the finding it covered is reported again. A waiver naming a rule this `qk` does not have is a warning, not a failure, because it hides nothing and may come from a newer `qk`. QK100 itself cannot be waived.
 
 **How to fix.** Fix the finding and delete the waiver, or correct the field named here. To extend or change a waiver, have a person approve it again with `qk waiver add`.
+
+## QK110 — Every top-level path has a code owner
+
+- Check key: `ownership.codeowners`
+- Phase: 1
+- Enforced by default at: gold
+
+**What it checks.** Every finding needs someone to act on it, and every change someone to review it. QK110 checks that each file and folder at the top of the repository has an owner in `CODEOWNERS`. It reads the file where the host of the `origin` remote reads it. GitHub: `.github/CODEOWNERS`, `CODEOWNERS`, then `docs/CODEOWNERS`. GitLab: `CODEOWNERS`, `docs/CODEOWNERS`, then `.gitlab/CODEOWNERS`. The first one found counts. Patterns are matched as the host matches them, and the last matching line wins, so a later line without owners takes ownership away. A top-level file has an owner when it has one itself; a top-level folder has one when a new file in it would get one. On another host, or without an `origin` remote, the check is skipped and says so. With `--changed`, only top-level paths the change adds are checked, unless the change touches `CODEOWNERS`.
+
+**How to fix.** Add a line for the path to `CODEOWNERS`, such as `/docs/ @your-team`, or give everything a default owner with `* @your-team` on the first line. If a line without owners comes later in the file, give it an owner or remove it. If a path should have no owner, ask a person to approve a waiver with `qk waiver add QK110`.
