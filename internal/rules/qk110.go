@@ -13,6 +13,7 @@ import (
 	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/glob"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/host"
 )
 
 func qk110() check.Rule {
@@ -33,19 +34,8 @@ func qk110() check.Rule {
 	}
 }
 
-// ownerHost is a git host that reads CODEOWNERS.
-type ownerHost struct {
-	name, mark string   // mark is what the remote's host name contains
-	locations  []string // where it reads CODEOWNERS, first found first
-}
-
-var ownerHosts = []ownerHost{
-	{"GitHub", "github", []string{".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"}},
-	{"GitLab", "gitlab", []string{"CODEOWNERS", "docs/CODEOWNERS", ".gitlab/CODEOWNERS"}},
-}
-
 func isCodeowners(file string) bool {
-	return slices.ContainsFunc(ownerHosts, func(h ownerHost) bool { return slices.Contains(h.locations, file) })
+	return slices.ContainsFunc(host.Known, func(h host.Host) bool { return slices.Contains(h.Codeowners, file) })
 }
 
 func runQK110(ctx check.Context) check.Result {
@@ -94,32 +84,29 @@ func runQK110(ctx check.Context) check.Result {
 		return pass
 	}
 
-	url, ok := changes.OriginURL(ctx.Root)
+	hostName, known, ok := host.Of(ctx.Root)
 	if !ok {
 		return check.Result{Status: check.Skipped, Reason: "no remote named `origin`, so QK110 cannot tell which host reads CODEOWNERS"}
 	}
-	host := remoteHost(url)
-	at := slices.IndexFunc(ownerHosts, func(h ownerHost) bool { return strings.Contains(host, h.mark) })
-	if at < 0 {
+	if known == nil {
 		return check.Result{Status: check.Skipped, Reason: fmt.Sprintf(
-			"remote `origin` is on `%s`, not GitHub or GitLab: QK110 does not know where that host reads CODEOWNERS", host)}
+			"remote `origin` is on `%s`, not GitHub or GitLab: QK110 does not know where that host reads CODEOWNERS", hostName)}
 	}
-	known := ownerHosts[at]
 
-	at = slices.IndexFunc(known.locations, func(l string) bool { return slices.Contains(tree, l) })
+	at := slices.IndexFunc(known.Codeowners, func(l string) bool { return slices.Contains(tree, l) })
 	if at < 0 {
 		if !everything {
 			return pass // the only CODEOWNERS is where this host does not read it, as before the change
 		}
-		return check.Result{Status: check.Fail, Findings: []check.Finding{{File: known.locations[0], Message: fmt.Sprintf(
-			"no CODEOWNERS file: %s reads %s", known.name, oneOf(known.locations))}}}
+		return check.Result{Status: check.Fail, Findings: []check.Finding{{File: known.Codeowners[0], Message: fmt.Sprintf(
+			"no CODEOWNERS file: %s reads %s", known.Name, oneOf(known.Codeowners))}}}
 	}
-	file := known.locations[at]
+	file := known.Codeowners[at]
 	data, err := os.ReadFile(filepath.Join(ctx.Root, filepath.FromSlash(file)))
 	if err != nil {
 		return check.Result{Status: check.Skipped, Reason: err.Error()}
 	}
-	lines := parseCodeowners(data, known.name == "GitLab")
+	lines := parseCodeowners(data, known.Name == "GitLab")
 
 	var findings []check.Finding
 	for _, top := range tops {
@@ -145,18 +132,6 @@ func runQK110(ctx check.Context) check.Result {
 func topOf(file string) string {
 	top, _, _ := strings.Cut(file, "/")
 	return top
-}
-
-// remoteHost returns the lower-case host name of a git remote URL, in the
-// `https://host/path`, `ssh://user@host:port/path` and `user@host:path` forms.
-func remoteHost(url string) string {
-	if _, rest, ok := strings.Cut(url, "://"); ok {
-		url = rest
-	}
-	host, _, _ := strings.Cut(url, "/")
-	host = host[strings.LastIndex(host, "@")+1:] // drop the user, and a password if the URL holds one
-	host, _, _ = strings.Cut(host, ":")
-	return strings.ToLower(host)
 }
 
 // ownerLine is one pattern line of a CODEOWNERS file.

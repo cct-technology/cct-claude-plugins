@@ -1,0 +1,6 @@
+# Who must review a change to a path. GitHub asks them when a pull request touches it.
+# Replace @your-team with a person or team that can write to this repository.
+
+# Quality Kit: an exception to a check, and the file that sets which checks block, need a person's review.
+/.quality/      @your-team
+/quality.yaml   @your-team

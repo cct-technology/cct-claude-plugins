@@ -26,6 +26,7 @@ import (
 	"github.com/rkvalvaa/cct-claude-plugins/internal/hook"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/scaffold"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
 )
 
@@ -157,6 +158,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 			return check.WriteSessionSummary(cmd.OutOrStdout(), reg, newContext(root, ""))
 		},
 	})
+	root.AddCommand(newInitCmd())
 	root.AddCommand(newWaiverCmd(reg))
 	root.AddCommand(newDocsImpactCmd())
 	root.AddCommand(newHookCmd(reg))
@@ -202,6 +204,30 @@ func repoRoot() (string, error) {
 		return root, nil
 	}
 	return cwd, nil
+}
+
+func newInitCmd() *cobra.Command {
+	var o scaffold.Options
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Set a repository up for Quality Kit: quality.yaml, the folders it names, and what the git host needs",
+		Long: "Writes quality.yaml, a README in each docs folder it names, and the line in .gitattributes that lets two branches each record an exception. " +
+			"When the `origin` remote is on GitHub, it also writes a CODEOWNERS stub and the CI workflow.\n\n" +
+			"A file that exists is never overwritten: it is reported as skipped, so a second run writes only what is still missing.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root, err := repoRoot()
+			if err != nil {
+				return err
+			}
+			o.Version = version
+			return scaffold.Init(cmd.OutOrStdout(), root, o)
+		},
+	}
+	cmd.Flags().StringVar(&o.DataClass, "data-class", "internal", "the most sensitive data the service handles: "+strings.Join(scaffold.DataClasses, ", "))
+	cmd.Flags().StringVar(&o.Maturity, "maturity", "bronze", "sets which checks block: "+strings.Join(scaffold.Maturities, ", "))
+	cmd.Flags().StringArrayVar(&o.Replaces, "replaces", nil, "a tool this system replaces; repeatable")
+	return cmd
 }
 
 func newWaiverCmd(reg []check.Rule) *cobra.Command {
