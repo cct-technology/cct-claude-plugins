@@ -98,7 +98,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "threat_models": { "description": "Threat model folder.", "type": "string" },
+        "threat_models": { "description": "Threat model folder. Without it, QK040 looks in `docs/security/threat-models`.", "type": "string" },
         "specs_dir": { "description": "Spec folder. A new spec here needs a threat model (QK040).", "type": "string" }
       }
     },

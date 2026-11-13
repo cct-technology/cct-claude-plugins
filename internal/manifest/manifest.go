@@ -40,6 +40,13 @@ type Manifest struct {
 	Docs      Docs              `yaml:"docs"`
 	Generated []Generated       `yaml:"generated"`
 	Contracts Contracts         `yaml:"contracts"`
+	Security  Security          `yaml:"security"`
+}
+
+// Security names the folders QK040 reads, relative to the repository root.
+type Security struct {
+	ThreatModels string `yaml:"threat_models"`
+	SpecsDir     string `yaml:"specs_dir"`
 }
 
 // Contracts lists the contract files checked for breaking changes, as globs.

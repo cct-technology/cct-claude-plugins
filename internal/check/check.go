@@ -230,6 +230,9 @@ func runSafely(r Rule, ctx Context) (res Result) {
 
 var ruleID = regexp.MustCompile(`^QK\d{3}$`)
 
+// checkKey is the pattern quality.schema.json sets for the keys under `modes`.
+var checkKey = regexp.MustCompile(`^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$`)
+
 // ValidateRegistry checks the invariants every registered rule must hold.
 func ValidateRegistry(rules []Rule) error {
 	var errs []error
@@ -242,8 +245,8 @@ func ValidateRegistry(rules []Rule) error {
 			errs = append(errs, fmt.Errorf("duplicate rule ID %s", r.ID))
 		}
 		seen[r.ID] = true
-		if r.Check == "" {
-			errs = append(errs, fmt.Errorf("%s: no check key", r.ID))
+		if !checkKey.MatchString(r.Check) {
+			errs = append(errs, fmt.Errorf("%s: check key %q cannot be a key under `modes` in quality.yaml; use lower-case words joined by dots, as in `docs.impact`", r.ID, r.Check))
 		}
 		if r.EnforcedFrom < Bronze || r.EnforcedFrom > Gold {
 			errs = append(errs, fmt.Errorf("%s: EnforcedFrom must be bronze, silver or gold", r.ID))
