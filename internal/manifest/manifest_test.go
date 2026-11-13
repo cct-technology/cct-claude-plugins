@@ -49,6 +49,9 @@ func TestLoadValidManifestUsingEveryKey(t *testing.T) {
 	if want := []string{"api/openapi.yaml"}; !reflect.DeepEqual(l.Manifest.Contracts.OpenAPI, want) {
 		t.Errorf("contracts.openapi = %v, want %v", l.Manifest.Contracts.OpenAPI, want)
 	}
+	if want := (Security{ThreatModels: "docs/security/threat-models", SpecsDir: "docs/specs"}); l.Manifest.Security != want {
+		t.Errorf("security = %+v, want %+v", l.Manifest.Security, want)
+	}
 }
 
 func TestGeneratorNamesTheCommandForAGeneratedFile(t *testing.T) {

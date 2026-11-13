@@ -29,7 +29,7 @@
 | `contracts.asyncapi` | list of strings | AsyncAPI files (QK031). |
 | `contracts.odcs` | list of strings | Open Data Contract Standard files (QK032). |
 | `security` | object | Where threat models and specs live. |
-| `security.threat_models` | string | Threat model folder. |
+| `security.threat_models` | string | Threat model folder. Without it, QK040 looks in `docs/security/threat-models`. |
 | `security.specs_dir` | string | Spec folder. A new spec here needs a threat model (QK040). |
 | `testing` | object | Human testing. |
 | `testing.uat_dir` | string | UAT plan folder. |

@@ -294,6 +294,7 @@ func TestValidateRegistry(t *testing.T) {
 		{"duplicate ID", []Rule{good, good}, "duplicate"},
 		{"bad ID", []Rule{rule("Q1", "k", Bronze, Result{})}, "Q1"},
 		{"no check key", []Rule{rule("QK002", "", Bronze, Result{})}, "check key"},
+		{"check key that `modes` in quality.yaml cannot name", []Rule{rule("QK002", "security.threat_model", Bronze, Result{})}, "security.threat_model"},
 		{"no maturity", []Rule{rule("QK002", "k", NoManifest, Result{})}, "EnforcedFrom"},
 		{"no run func", []Rule{func() Rule { r := good; r.Run = nil; return r }()}, "Run"},
 	}

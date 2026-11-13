@@ -46,6 +46,16 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 
 **How to fix.** Keep the API compatible: put back what was removed, or make the new requirement optional. If the break is intended, release it as a new API version, or ask a person to approve a waiver with `qk waiver add QK030`.
 
+## QK040 — A new spec has a threat model
+
+- Check key: `security.threat-model`
+- Phase: 1
+- Enforced by default at: gold
+
+**What it checks.** Security thinking starts when a feature is specified, not after it ships. Each Markdown file added under `security.specs_dir` in `quality.yaml` needs a threat model under `security.threat_models`, which is `docs/security/threat-models` unless you name another folder. A threat model belongs to a spec when it has the same file name, or when its frontmatter has `spec:` with the spec's path from the repository root. Only new specs are checked: editing or moving a spec needs nothing. Without a `quality.yaml`, QK040 checks `docs/specs` if that folder exists. With a `quality.yaml` that names no `specs_dir`, it checks nothing.
+
+**How to fix.** Write a threat model for the spec and save it under `security.threat_models`, with the spec's file name or with `spec: <path of the spec>` in its frontmatter. If the spec needs none, ask a person to approve a waiver with `qk waiver add QK040`.
+
 ## QK100 — Waivers are valid, owned and not expired
 
 - Check key: `waivers.valid`
