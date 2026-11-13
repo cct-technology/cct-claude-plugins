@@ -112,6 +112,32 @@ func (s *Set) ContentAtBase(path string) (content []byte, ok bool, err error) {
 	return []byte(out), err == nil, err
 }
 
+// Tree lists the files in the working tree at root that git tracks or would
+// add: an untracked file counts unless git ignores it, a deleted one does not.
+// It needs no commits and no base. Outside a repository it returns ErrNotRepo.
+func Tree(root string) ([]string, error) {
+	out, err := git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return nil, notRepo(err)
+	}
+	// The index still lists a file deleted from the working tree.
+	deleted, err := git(root, "ls-files", "--deleted", "-z")
+	if err != nil {
+		return nil, err
+	}
+	gone := map[string]bool{}
+	for _, p := range strings.Split(deleted, "\x00") {
+		gone[p] = true
+	}
+	var files []string
+	for _, p := range strings.Split(out, "\x00") {
+		if p != "" && !gone[p] {
+			files = append(files, p)
+		}
+	}
+	return files, nil
+}
+
 // defaultBranch prefers origin/HEAD, so commits not yet pushed count as changes.
 func defaultBranch(root string) (string, error) {
 	if out, err := git(root, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"); err == nil {

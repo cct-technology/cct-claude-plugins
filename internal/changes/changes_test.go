@@ -513,3 +513,37 @@ func TestRestoreWorktreeTakesPathsLiterally(t *testing.T) {
 		}
 	}
 }
+
+func TestTreeListsFilesGitTracksOrWouldAdd(t *testing.T) {
+	dir := newRepo(t, "main")
+	write(t, dir, ".gitignore", "ignored.txt\n")
+	write(t, dir, "kept.txt", "x\n")
+	write(t, dir, "gone.txt", "x\n")
+	write(t, dir, "old.txt", "a file long enough for git to follow through a rename\n")
+	commit(t, dir, "base")
+	write(t, dir, "new/untracked.txt", "x\n")
+	write(t, dir, "ignored.txt", "x\n")
+	if err := os.Remove(filepath.Join(dir, "gone.txt")); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "mv", "old.txt", "moved.txt")
+
+	got, err := Tree(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(got)
+	if want := []string{".gitignore", "kept.txt", "moved.txt", "new/untracked.txt"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Tree() = %v, want %v", got, want)
+	}
+}
+
+func TestTreeOutsideARepositoryIsAnError(t *testing.T) {
+	isolate(t)
+	dir := t.TempDir()
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+
+	if got, err := Tree(dir); !errors.Is(err, ErrNotRepo) {
+		t.Errorf("Tree() = %v, %v, want ErrNotRepo", got, err)
+	}
+}
