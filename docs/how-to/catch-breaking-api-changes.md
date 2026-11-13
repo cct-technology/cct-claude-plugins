@@ -2,6 +2,8 @@
 
 QK030 compares each changed OpenAPI file with its version at the base, and fails when the change breaks clients. It uses [oasdiff](https://github.com/oasdiff/oasdiff).
 
+To have Claude update the contract for a change and bring a break to you, see [Keep contracts true with Claude](keep-contracts-true-with-claude.md).
+
 ## List your OpenAPI files
 
 In `quality.yaml`:

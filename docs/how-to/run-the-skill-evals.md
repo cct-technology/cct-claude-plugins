@@ -2,7 +2,7 @@
 
 Each skill has eval cases under `plugins/quality-kit/evals/`: a prompt, a script that builds the repository Claude starts in, and graders that check what Claude did. `claude plugin eval` runs them with real model calls, so run them when you change a skill, not on every push.
 
-On 2026-11-13 three runs of each of the six cases, on Sonnet, cost about $1.50.
+On 2026-11-13 three runs of each of the nine cases, on Sonnet, cost about $2.30.
 
 ## What you need
 
@@ -10,8 +10,9 @@ On 2026-11-13 three runs of each of the six cases, on Sonnet, cost about $1.50.
 - **Claude Code 2.1.269 or later**, signed in: `claude auth login`.
 - **On Linux and WSL2: `bubblewrap` and `socat`.**
 - **Go**, to build `qk`.
+- **`oasdiff` 1.12 or newer where the sandbox can see it**, for the `contract-guard` cases. Claude's shell sees system folders such as `/usr/local/bin`, and nothing under your home folder, which is where `go install` puts it.
 
-These steps were checked on WSL2 with Ubuntu 24.04. They have not been run on macOS.
+These steps were checked on WSL2 with Ubuntu 24.04. They have not been run on macOS. `oasdiff` was checked as a copy in the plugin's `bin` folder, not in a system folder.
 
 ## Run them
 
@@ -54,6 +55,8 @@ To run less, add `--case 'quality-init-*'` or `--runs 1`.
 | `qk: command not found` | The plugin's `bin` folder is not on `PATH` | Set `PATH` as above |
 | `read-only file system` from `qk init` | The run is under `/tmp` | Set `TMPDIR` as above |
 | `install-qk: ...` | No built `qk` on `PATH`, the wrong version, or the plugin's `bin` comes first | Build `qk` and set `PATH` as above |
+
+One failure shows only in the scores. When the `contract-guard` cases fail on `qk-compared-the-contract` and `qk-found-the-break`, `qk` skipped QK030 because Claude's shell could not see `oasdiff`. Install it in a system folder. Without the rights for that, copy the `oasdiff` binary into `plugins/quality-kit/bin/` for the run and delete it afterwards: that folder is on `PATH` and the sandbox sees it. Do not commit the copy.
 
 ## Add a case
 
