@@ -2,6 +2,8 @@
 
 QK010 checks that when code changes, the docs that describe it change on the same branch. You say which docs go with which code.
 
+To have Claude write the doc changes a branch owes, see [Update the docs for a change with Claude](update-docs-with-claude.md).
+
 ## Map code to docs
 
 In `quality.yaml`:
