@@ -56,6 +56,16 @@ A rule's mode decides what a failure does: `enforced` blocks, `advisory` warns, 
 
 **How to fix.** Write a threat model for the spec and save it under `security.threat_models`, with the spec's file name or with `spec: <path of the spec>` in its frontmatter. If the spec needs none, ask a person to approve a waiver with `qk waiver add QK040`.
 
+## QK061 — Dependencies have a lockfile that changes with them
+
+- Check key: `supply-chain.lockfile`
+- Phase: 1
+- Enforced by default at: silver, gold
+
+**What it checks.** Without a lockfile, a build installs whatever versions are newest that day, not the ones that were reviewed and tested. QK061 reads every dependency manifest git tracks or would add: `package.json` (npm, pnpm, Yarn, Bun), `go.mod`, `composer.json`, `Cargo.toml`, `Pipfile`, and `pyproject.toml` when Poetry or uv is in use. A manifest that declares dependencies needs its lockfile in git. In a workspace, a lockfile in a parent folder counts. When a manifest's dependencies change, its lockfile must change in the same change set. Other edits to a manifest, such as a script or a version number, need nothing. QK061 only reads files; it never runs a package manager. Folders named `node_modules` or `vendor` are left out. Python with only `requirements.txt`, or a `pyproject.toml` without Poetry or uv, has no lockfile to check, so the check is skipped and says so. When there is no base to compare with, QK061 only checks that each lockfile is there. Outside a git repository it checks nothing.
+
+**How to fix.** Run the package manager so it writes the lockfile (`npm install`, `pnpm install`, `yarn install`, `go mod tidy`, `composer update --lock`, `cargo generate-lockfile`, `poetry lock`, `uv lock`, `pipenv lock`), and commit the lockfile with the manifest. If the lockfile exists but is reported as missing, git ignores it: take it out of `.gitignore`. If a manifest should have no lockfile, ask a person to approve a waiver with `qk waiver add QK061`.
+
 ## QK100 — Waivers are valid, owned and not expired
 
 - Check key: `waivers.valid`
