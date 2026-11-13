@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,6 +93,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 
 	var (
 		format, base string
+		sarifFile    string
 		changedOnly  bool
 		full         bool
 	)
@@ -114,6 +116,15 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 				return ctx.ChangesErr // the user named a base that does not exist: usage error
 			}
 			rep := check.Run(reg, check.ConfigFrom(ctx.Manifest), ctx)
+			if sarifFile != "" {
+				var sarif bytes.Buffer
+				if err := check.WriteSARIF(&sarif, rep, reg, version); err != nil {
+					return err
+				}
+				if err := os.WriteFile(sarifFile, sarif.Bytes(), 0o644); err != nil {
+					return fmt.Errorf("--sarif: %w", err)
+				}
+			}
 			if format == "sarif" {
 				err = check.WriteSARIF(cmd.OutOrStdout(), rep, reg, version)
 			} else {
@@ -129,6 +140,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 		},
 	}
 	checkCmd.Flags().StringVar(&format, "format", "text", "output format: "+strings.Join(checkFormats, ", "))
+	checkCmd.Flags().StringVar(&sarifFile, "sarif", "", "also write the report as SARIF to this file, whatever --format prints")
 	checkCmd.Flags().StringVar(&base, "base", "", "compare against the merge-base with this ref (default: the default branch, from origin/HEAD, main or master)")
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
 	checkCmd.Flags().BoolVar(&full, "full", false, "also run slow checks: QK020 runs every generator (on by default when CI=true)")

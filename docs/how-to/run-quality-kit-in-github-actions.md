@@ -33,6 +33,8 @@ Without the token, the job warns `could not download qk_...` and passes, and the
 - **A `quality-kit-sarif` artifact**: SARIF 2.1.0. Waived findings are results with a suppression that gives the waiver reason. Checks that did not run are notifications.
 - **A failed job when an enforced check fails**, when a [`setup`](#set-up-what-the-checks-need) command fails, or when the downloaded `qk` does not match `checksums.txt`, which may mean a tampered release. When `qk` cannot be downloaded or `qk check` cannot run, the job warns and passes, and the comment says why qk did not run. Check the comment as well as the status.
 
+The comment, the artifact and the job result come from one `qk check` run, so they agree, and each command under `generated` runs once.
+
 ## Set up what the checks need
 
 The workflow installs only `qk`. Two checks run other tools: QK020 runs every command listed under `generated` in `quality.yaml`, and QK030 runs `oasdiff`. Give the job those tools with `setup`: shell commands that run in the root of your repository before `qk check`.

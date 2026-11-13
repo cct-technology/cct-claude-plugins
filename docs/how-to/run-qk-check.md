@@ -48,6 +48,14 @@ This also runs the slow checks: QK020 runs every command listed under `generated
 - `--format claude` lists only what needs acting on, then a `Skipped:` line.
 - `--format sarif` is SARIF 2.1.0, for GitHub code scanning and other SARIF readers. See [run Quality Kit in GitHub Actions](run-quality-kit-in-github-actions.md).
 
+To get SARIF and another format from one run, add `--sarif <file>`. The SARIF goes to the file, and `--format` still decides what is printed:
+
+```sh
+qk check --format claude --sarif qk.sarif
+```
+
+Write the file outside the repository, or ignore it in git: a new file in the repository counts as a change in the next run.
+
 Exit code `0`: nothing blocks. `1`: an enforced check failed. `2`: usage error.
 
 ## See a short summary

@@ -118,13 +118,12 @@ jobs:
             echo "qk did not run: ${PROBLEM:-qk is not installed}." > "$summary"
           else
             code=0
-            qk check --base "origin/$BASE" --format sarif > "$RUNNER_TEMP/qk.sarif" || code=$?
+            # One run for the job result, the SARIF and the comment: a second
+            # run would repeat every generator and see what the first left behind.
+            qk check --base "origin/$BASE" --format claude --sarif "$RUNNER_TEMP/qk.sarif" > "$summary" || code=$?
             if [ "$code" -le 1 ]; then
               echo "exit-code=$code" >> "$GITHUB_OUTPUT"
               echo "sarif=true" >> "$GITHUB_OUTPUT"
-              # ponytail: a second run for the summary doubles the time; write
-              # both formats in one run once the slow checks (QK020, QK060) land.
-              qk check --base "origin/$BASE" --format claude > "$summary" || true
             else
               echo "::error::Quality Kit: qk check exited $code. See its message above."
               echo "qk check could not run (exit $code). See the workflow log." > "$summary"
