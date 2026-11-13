@@ -708,6 +708,43 @@ func hookJSON(t *testing.T, stdout string) map[string]any {
 	return v
 }
 
+// CI needs the summary for people and SARIF for code scanning from the same
+// run: a second run would repeat every generator and could see another tree.
+func TestCheckSarifFlagWritesSARIFBesideTheChosenFormat(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	runs := 0
+	counted := failing
+	counted.Run = func(ctx check.Context) check.Result {
+		runs++
+		return failing.Run(ctx)
+	}
+	file := filepath.Join(t.TempDir(), "qk.sarif")
+
+	code, out, errOut := runQK(t, []check.Rule{counted}, "check", "--format", "claude", "--sarif", file)
+
+	if code != 1 || !strings.HasPrefix(out, "Quality Kit: 1 fail, 0 warn.\nQK010 fail:") {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want exit 1 and the claude report", code, out, errOut)
+	}
+	if runs != 1 {
+		t.Errorf("the rule ran %d times, want once", runs)
+	}
+	_, want, _ := runQK(t, []check.Rule{failing}, "check", "--format", "sarif")
+	if got, err := os.ReadFile(file); err != nil || string(got) != want {
+		t.Errorf("--sarif wrote %q (%v), want what --format sarif prints:\n%s", got, err, want)
+	}
+}
+
+func TestCheckSarifFlagSaysWhenTheFileCannotBeWritten(t *testing.T) {
+	inRepo(t, "version: 1\nmaturity: silver\n")
+	file := filepath.Join(t.TempDir(), "no-such-folder", "qk.sarif")
+
+	code, out, errOut := runQK(t, []check.Rule{failing}, "check", "--sarif", file)
+
+	if code != 2 || out != "" || !strings.Contains(errOut, "no-such-folder") {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want exit 2, no report and the path named", code, out, errOut)
+	}
+}
+
 func failingRule(id, key string) check.Rule {
 	return testRule(id, key, check.Result{Status: check.Fail, Findings: []check.Finding{{File: "internal/x.go", Message: "docs/x.md must change too"}}})
 }

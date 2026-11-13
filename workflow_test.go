@@ -61,18 +61,112 @@ func TestCIWorkflowInstallsThePluginVersion(t *testing.T) {
 	}
 }
 
-const setupStepName = "Set up what the checks need"
+const (
+	setupStepName = "Set up what the checks need"
+	checkStepName = "qk check"
+)
+
+func stepNamed(t *testing.T, name string) step {
+	t.Helper()
+	for _, s := range readQualityWorkflow(t).Jobs.Check.Steps {
+		if s.Name == name {
+			return s
+		}
+	}
+	t.Fatalf("quality.yml has no step named %q", name)
+	return step{}
+}
 
 // setupStep returns the step that runs the `setup` input.
 func setupStep(t *testing.T) step {
 	t.Helper()
-	for _, s := range readQualityWorkflow(t).Jobs.Check.Steps {
-		if s.Name == setupStepName {
-			return s
+	return stepNamed(t, setupStepName)
+}
+
+// The job result, the SARIF and the pull request comment must come from one
+// run. A second run repeats every generator, and sees what the first left behind.
+func TestQualityWorkflowRunsQkCheckOnce(t *testing.T) {
+	if n := strings.Count(stepNamed(t, checkStepName).Run, "qk check --"); n != 1 {
+		t.Errorf("the %q step calls qk check %d times, want once", checkStepName, n)
+	}
+}
+
+// A generator that writes a file not listed under `generated` leaves it
+// changed, with a QK020 warning. The comment must show that warning, and must
+// not show a QK010 finding on the leftover file that the job never failed on.
+func TestQkCheckStepReportsWhatTheJobDecidedOn(t *testing.T) {
+	needLinuxShell(t)
+	bin := t.TempDir()
+	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "qk"), "./cmd/qk").CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, out)
+	}
+	generator := "#!/bin/sh\necho generated > out.txt\nmkdir -p src\necho 'package src' > src/extra.go\necho run >> \"$GEN_RUNS\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "gen-thing"), []byte(generator), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repo := t.TempDir()
+	for name, content := range map[string]string{
+		"quality.yaml": "version: 1\nmaturity: silver\n" +
+			"docs:\n  impact_map:\n    - paths: [\"src/**\"]\n      docs: [\"docs/**\"]\n" +
+			"generated:\n  - file: out.txt\n    cmd: gen-thing\n",
+		"out.txt": "generated\n",
+	} {
+		if err := os.WriteFile(filepath.Join(repo, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
 		}
 	}
-	t.Fatalf("quality.yml has no step named %q", setupStepName)
-	return step{}
+	gitconfig := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(gitconfig, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"add", "-A"},
+		{"-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-q", "-m", "base"},
+		{"update-ref", "refs/remotes/origin/main", "HEAD"}, // what the workflow's checkout gives
+	} {
+		if out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runnerTemp := t.TempDir()
+	genRuns := filepath.Join(runnerTemp, "gen-runs")
+	output := filepath.Join(runnerTemp, "github-output")
+
+	cmd := exec.Command("bash", "-e", "-c", stepNamed(t, checkStepName).Run)
+	cmd.Dir = repo
+	cmd.Env = append(os.Environ(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"BASE=main", "PROBLEM=", "CI=true", "GEN_RUNS="+genRuns,
+		"RUNNER_TEMP="+runnerTemp, "GITHUB_OUTPUT="+output, "GITHUB_STEP_SUMMARY="+filepath.Join(runnerTemp, "step-summary"))
+	out, err := cmd.CombinedOutput()
+	t.Logf("qk check step:\n%s", out)
+	if err != nil {
+		t.Fatalf("qk check step: %v", err)
+	}
+
+	if runs, _ := os.ReadFile(genRuns); strings.Count(string(runs), "run") != 1 {
+		t.Errorf("the generator ran %d times, want once", strings.Count(string(runs), "run"))
+	}
+	summary, _ := os.ReadFile(filepath.Join(runnerTemp, "qk-summary.txt"))
+	if !strings.Contains(string(summary), "QK020 warn") || !strings.Contains(string(summary), "src/extra.go") {
+		t.Errorf("summary lacks the QK020 warning about src/extra.go:\n%s", summary)
+	}
+	if strings.Contains(string(summary), "QK010") {
+		t.Errorf("summary has a QK010 finding the job did not decide on:\n%s", summary)
+	}
+	if outputs, _ := os.ReadFile(output); !strings.Contains(string(outputs), "exit-code=0") || !strings.Contains(string(outputs), "sarif=true") {
+		t.Errorf("step outputs = %q, want exit-code=0 and sarif=true", outputs)
+	}
+	var sarif struct {
+		Runs []struct{ Results []struct{ RuleID string } }
+	}
+	raw, _ := os.ReadFile(filepath.Join(runnerTemp, "qk.sarif"))
+	if err := json.Unmarshal(raw, &sarif); err != nil || len(sarif.Runs) != 1 || len(sarif.Runs[0].Results) != 1 || sarif.Runs[0].Results[0].RuleID != "QK020" {
+		t.Errorf("qk.sarif = %s (%v), want one result, for QK020", raw, err)
+	}
 }
 
 // The caller's commands reach the step as an environment variable. Written

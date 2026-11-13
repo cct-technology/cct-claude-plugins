@@ -2,8 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- The reusable workflow `.github/workflows/quality.yml` runs `qk check` once, where it ran twice. The pull request comment, the SARIF and the job result now come from the same run, and each command under `generated` runs once. Before, a generator that wrote a file not listed under `generated` lost its QK020 warning in the comment, and the comment could show a QK010 finding on that file which the job had not failed on.
+
 ### Added
 
+- `qk check --sarif <file>` also writes the report as SARIF to a file, whatever `--format` prints, so one run gives both.
 - QK110 (`ownership.codeowners`): each file and folder at the top of the repository has an owner in `CODEOWNERS`. The file is read where the host of the `origin` remote reads it: GitHub (`.github/`, the root, `docs/`) or GitLab (the root, `docs/`, `.gitlab/`), first found first. Patterns are matched as the host matches them and the last matching line wins, so a later line without owners is a finding. A folder is owned when a new file in it would get an owner. On another host, or without an `origin` remote, the check is skipped with the reason. With `--changed`, only top-level paths the change adds are checked, unless the change touches `CODEOWNERS`. It needs no configuration. Enforced from gold. How-to: `docs/how-to/give-every-path-a-code-owner.md`.
 - QK061 (`supply-chain.lockfile`): every dependency manifest git tracks (`package.json`, `go.mod`, `composer.json`, `Cargo.toml`, `Pipfile`, and `pyproject.toml` with Poetry or uv) that declares dependencies needs its lockfile in git, and when its dependencies change, the lockfile must change in the same change set. A workspace lockfile in a parent folder counts. Other edits to a manifest need nothing. Python with only `requirements.txt` is skipped with the reason. It needs no configuration and never runs a package manager. With `--changed`, only manifests and lockfiles in the change set are looked at. Enforced from silver. How-to: `docs/how-to/keep-lockfiles-in-step.md`.
 - QK040 (`security.threat-model`): each Markdown file added under `security.specs_dir` in `quality.yaml` needs a threat model under `security.threat_models` (default `docs/security/threat-models`). A threat model belongs to a spec when it has the same file name, or when its frontmatter has `spec:` with the spec's path. Editing or moving a spec needs nothing. Without a `quality.yaml`, `docs/specs` is checked if it exists. Enforced from gold. How-to: `docs/how-to/require-a-threat-model-for-a-new-spec.md`.
