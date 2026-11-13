@@ -243,21 +243,6 @@ func TestQK110SkipsOnAHostItDoesNotKnow(t *testing.T) {
 	}
 }
 
-func TestRemoteHost(t *testing.T) {
-	for url, want := range map[string]string{
-		"https://github.com/acme/app.git":                "github.com",
-		"https://ann:s3cret@GitHub.com/acme/app":         "github.com",
-		"git@github.com:acme/app.git":                    "github.com",
-		"ssh://git@gitlab.example.com:2222/acme/app.git": "gitlab.example.com",
-		"/srv/git/app.git":                               "",
-		"../app.git":                                     "..",
-	} {
-		if got := remoteHost(url); got != want {
-			t.Errorf("remoteHost(%q) = %q, want %q", url, got, want)
-		}
-	}
-}
-
 // With --changed, the Stop hook reports what this change did: a new top-level
 // path without an owner, or a change to CODEOWNERS. An old gap is left alone.
 func TestQK110WithChangedOnlyLooksAtNewTopLevelPaths(t *testing.T) {

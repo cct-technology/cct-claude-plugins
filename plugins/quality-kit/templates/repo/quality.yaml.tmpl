@@ -1,0 +1,20 @@
+# What this repository owes. `qk check` reads it, and `qk explain <rule>` says what a check wants.
+version: 1
+service: [[json .Service]]
+data_class: [[.DataClass]]
+maturity: [[.Maturity]]
+docs:
+  root: docs
+  diataxis: true
+  # impact_map names the docs that must change with the code (QK010), for example:
+  # impact_map:
+  #   - paths: ["internal/config/**"]
+  #     docs: ["docs/reference/settings.md"]
+security:
+  threat_models: docs/security/threat-models
+  specs_dir: docs/specs # a new spec in this folder needs a threat model (QK040)
+testing:
+  uat_dir: docs/testing/uat
+[[- if .Replaces]]
+  replaces: [[json .Replaces]] # the tools this system takes over from
+[[- end]]

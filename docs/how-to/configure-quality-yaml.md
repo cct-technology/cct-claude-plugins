@@ -4,7 +4,7 @@
 
 ## Add a manifest
 
-Create `quality.yaml` at the repository root:
+[`qk init`](set-up-quality-kit-in-a-repository.md) writes one for you, with the docs folders it names. To write it by hand, create `quality.yaml` at the repository root:
 
 ```yaml
 version: 1

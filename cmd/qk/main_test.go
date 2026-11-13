@@ -911,3 +911,79 @@ func TestStopHookLeavesOutSlowChecks(t *testing.T) {
 		t.Errorf("exit code = %d, stdout = %q, stderr = %q, want silence", code, out, errOut)
 	}
 }
+
+// qk init writes at the repository root, and what it writes is a repository
+// qk check accepts: the manifest passes QK001 and nothing blocks.
+func TestInitWritesARepositoryQkCheckAccepts(t *testing.T) {
+	dir := gitRepo(t)
+	sub := filepath.Join(dir, "internal", "pkg")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(sub)
+
+	code, out, errOut := runQK(t, rules.All(), "init", "--data-class", "client", "--maturity", "silver", "--replaces", "Excel", "--replaces", "Old CRM")
+
+	if code != 0 || errOut != "" {
+		t.Fatalf("init: exit code = %d, stderr = %q", code, errOut)
+	}
+	if !strings.Contains(out, "wrote quality.yaml\n") {
+		t.Errorf("init printed %q, want it to report quality.yaml", out)
+	}
+	manifest, err := os.ReadFile(filepath.Join(dir, "quality.yaml"))
+	if err != nil {
+		t.Fatalf("no quality.yaml at the repository root: %v", err)
+	}
+	for _, want := range []string{"data_class: client\n", "maturity: silver\n", `replaces: ["Excel","Old CRM"]`} {
+		if !strings.Contains(string(manifest), want) {
+			t.Errorf("quality.yaml lacks %q:\n%s", want, manifest)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(sub, "quality.yaml")); err == nil {
+		t.Error("wrote quality.yaml in the subfolder")
+	}
+
+	code, out, errOut = runQK(t, rules.All(), "check", "--format", "json")
+	if code != 0 {
+		t.Fatalf("check: exit code = %d, stderr = %q\n%s", code, errOut, out)
+	}
+	var rep check.Report
+	if err := json.Unmarshal([]byte(out), &rep); err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Results) == 0 || rep.Results[0].Rule != "QK001" || rep.Results[0].Status != check.Pass {
+		t.Errorf("check = %s, want QK001 to pass", out)
+	}
+}
+
+func TestInitWithoutAnswersWritesAnInternalBronzeManifest(t *testing.T) {
+	inRepo(t, "")
+
+	code, _, errOut := runQK(t, nil, "init")
+
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
+	}
+	manifest, _ := os.ReadFile("quality.yaml")
+	for _, want := range []string{"data_class: internal\n", "maturity: bronze\n"} {
+		if !strings.Contains(string(manifest), want) {
+			t.Errorf("quality.yaml lacks %q:\n%s", want, manifest)
+		}
+	}
+}
+
+func TestInitUnknownAnswerIsAUsageErrorAndWritesNothing(t *testing.T) {
+	inRepo(t, "")
+
+	code, out, errOut := runQK(t, nil, "init", "--maturity", "platinum")
+
+	if code != 2 || out != "" {
+		t.Errorf("exit code = %d, stdout = %q, want 2 and nothing on stdout", code, out)
+	}
+	if !strings.Contains(errOut, "--maturity") || !strings.Contains(errOut, "bronze, silver, gold") {
+		t.Errorf("stderr = %q, want the flag and the allowed values", errOut)
+	}
+	if entries, _ := os.ReadDir("."); len(entries) > 0 {
+		t.Errorf("wrote %d files before checking the answers", len(entries))
+	}
+}

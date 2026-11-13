@@ -4,7 +4,7 @@ Pull requests get the same checks Claude gets when it tries to finish, and a com
 
 ## Add the workflow
 
-Add `.github/workflows/quality-kit.yml` to your repository:
+[`qk init`](set-up-quality-kit-in-a-repository.md) writes this workflow when the `origin` remote is on GitHub. To add it by hand, create `.github/workflows/quality-kit.yml`:
 
 ```yaml
 name: Quality Kit
