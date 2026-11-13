@@ -2,7 +2,7 @@
 
 Each skill has eval cases under `plugins/quality-kit/evals/`: a prompt, a script that builds the repository Claude starts in, and graders that check what Claude did. `claude plugin eval` runs them with real model calls, so run them when you change a skill, not on every push.
 
-On 2026-11-13 the whole suite, three runs of each case on Sonnet, cost about $0.80.
+On 2026-11-13 three runs of each of the six cases, on Sonnet, cost about $1.50.
 
 ## What you need
 
