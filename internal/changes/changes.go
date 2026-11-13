@@ -112,6 +112,13 @@ func (s *Set) ContentAtBase(path string) (content []byte, ok bool, err error) {
 	return []byte(out), err == nil, err
 }
 
+// OriginURL returns the URL of the remote named origin; ok is false when there is none.
+// The URL may hold credentials: do not print it.
+func OriginURL(root string) (url string, ok bool) {
+	out, err := git(root, "remote", "get-url", "origin")
+	return strings.TrimSpace(out), err == nil
+}
+
 // Tree lists the files in the working tree at root that git tracks or would
 // add: an untracked file counts unless git ignores it, a deleted one does not.
 // It needs no commits and no base. Outside a repository it returns ErrNotRepo.

@@ -16,6 +16,7 @@ func All() []check.Rule {
 		qk040(),
 		qk061(),
 		qk100(),
+		qk110(),
 	}
 }
 
