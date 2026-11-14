@@ -5,8 +5,61 @@ With the plugin enabled, three hooks run `qk` through `bin/qk` in every session.
 | When | What happens |
 | --- | --- |
 | A session starts, resumes, or is cleared or compacted | `qk context` is added to Claude's context: maturity, which checks are enforced, open findings, and waivers ending soon. |
-| Claude runs a shell command or edits a file | If it records an exception (`qk waiver add`, `qk docs-impact`) or touches `.quality/` or `quality.yaml`, Claude Code asks a person first. |
+| Claude runs a shell command or edits a file | If it records an exception (`qk waiver add`, `qk docs-impact`) or could change `.quality/` or `quality.yaml`, Claude Code asks a person first. Reading them asks nobody. |
 | Claude tries to finish | `qk check --changed` runs. Enforced failures send Claude back with the findings. Advisory findings are shown to you, and Claude stops. |
+
+## When you are asked to approve
+
+The prompt means Claude is about to record an exception, or to change `.quality/` or `quality.yaml`, where a check can be turned off. Read what it wants to change before you approve.
+
+| Claude does this | Asked? |
+| --- | --- |
+| Runs `qk waiver add` or `qk docs-impact` | Yes |
+| Edits or writes a file under `.quality/`, or `quality.yaml` | Yes |
+| Runs a shell command that names one of them, unless it is a plain read | Yes |
+| Runs a plain read of one of them | No |
+
+### What a plain read is
+
+A shell line that names `.quality/` or `quality.yaml` is a plain read when all of this holds. The hook lists what is allowed; anything else on such a line is asked about.
+
+- **Every command on the line only reads.** These do: `cat`, `head`, `tail`, `grep`, `rg`, `ls`, `find`, `wc`, `diff`, `jq`, `test`, `echo`, and in PowerShell `Get-Content`, `Select-String`, `Test-Path`, `Get-Item` and `Get-ChildItem`. So do `git diff`, `log`, `show`, `status` and `blame`. `git add` and `git commit` record a file without changing it, so they count too.
+- **A few other commands may stand beside a read**, when they do not name the path themselves: `qk`, `cd`, `which`, `type` and `command -v`.
+- **Every word is written out in full.** No variables and no `$( )`, with one exception: `$(git merge-base <rev> <rev>)`. Outside quotes a word may hold letters, digits and `_ . / : , @ % + = * ? ~ -`, and `find` may be given `\(` and `\)`. Inside quotes anything goes.
+- **The commands are joined plainly**: `;`, `&&`, `||`, `|`, `if`, `( )` and `{ }`. No assignments, loops, functions or here-documents.
+- **No output goes to the path**, or to a target that is not written out.
+
+So these are not asked about:
+
+```sh
+cat quality.yaml
+test -f quality.yaml && qk init --maturity silver
+if [ -f quality.yaml ]; then cat quality.yaml; fi
+git diff "$(git merge-base main HEAD)" -- quality.yaml
+grep -n "silver|gold" quality.yaml | head -20
+ls -a; cat quality.yaml 2>/dev/null; which qk
+```
+
+And these are:
+
+```sh
+sed -i 's/silver/bronze/' quality.yaml    # changes it
+cat new.yaml > quality.yaml               # output goes to it
+echo quality.yaml | xargs rm              # xargs is no reader
+cat quality.yaml; rm $_                   # a variable: $_ is the last word of the command before
+cat "$HOME/repo/quality.yaml"             # a read, but with a variable
+cat quality.yaml && make docs             # a read, but make is not on the list
+sed -n '1,5p' quality.yaml                # a read, but sed can also write
+```
+
+The last three are reads, and you are asked all the same. A hook that reads text cannot follow everything a shell does, so it lets a narrow, certain shape through and asks about the rest. A guess that is wrong lets a change through without you.
+
+### How the hook reads a line
+
+- **Bash lines are parsed**, with the parser of [`shfmt`](https://github.com/mvdan/sh), so quotes, escapes and comments are read as Bash reads them. A line the parser cannot read is asked about. The Bash tool may run zsh, as on macOS: the line is still read as Bash, which is one reason words outside quotes are held to plain characters.
+- **PowerShell lines are not parsed.** The same rules are applied to the text of the line.
+
+The hook runs nothing. It can miss a write when the name is not written on the line: a file name in a variable from an earlier command, a pattern such as `*.yaml`, a script that does the writing, or another name for the same file, such as a link. The name counts in any case, so `QUALITY.YAML` is asked about too, and so is the usual Windows short name, `QUALIT~1.YAM`. Review of `.quality/` and `quality.yaml` at merge is the backstop: see [who approves](waive-a-finding.md#who-approves).
 
 ## When Claude is sent back
 
