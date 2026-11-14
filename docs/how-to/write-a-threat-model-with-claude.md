@@ -52,6 +52,8 @@ Without Linear, tick the lines off as the work is done.
 
 Each threat names the Annex A control of ISO/IEC 27001:2022 that its mitigation serves, for example `A.8.24 Use of cryptography`. The threat model can then stand as evidence for that control. A new external service also gets a supplier control, A.5.19 to A.5.23.
 
+The number and the title are the ones in Annex A of the standard, written out in full: `A.5.34 Privacy and protection of personal identifiable information (PII)`, not a shortened form. The skill picks from 30 of the 93 controls, the ones a mitigation in software usually serves. They are listed in `plugins/quality-kit/skills/threat-model/references/annex-a.md`.
+
 ## When the feature changes
 
 Ask again. Claude keeps the IDs, the ticks and every line a person signed, and adds what is new.
