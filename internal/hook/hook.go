@@ -4,7 +4,6 @@ package hook
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -32,7 +31,9 @@ var (
 	exceptionCommand = regexp.MustCompile(`(^|[\s"'/\\&;|(])(?i:qk(\.exe)?)["']?\s+(waiver\s+add|docs-impact)\b`)
 	// protectedName: text that names .quality/ or quality.yaml, after and
 	// before anything that is not part of a file name, as in `>&quality.yaml`.
-	protectedName = regexp.MustCompile(`(^|[^\w.-])(\.quality([^\w.-]|$)|quality\.yaml\b)`)
+	// In any case, and with dots after the folder's name: Windows and macOS
+	// find the file as QUALITY.YAML, and Windows finds the folder as `.quality.`.
+	protectedName = regexp.MustCompile(`(?i)(^|[^\w.-])(\.quality\.*([^\w.-]|$)|quality\.yaml\b)`)
 )
 
 // PreToolUse asks a person before Claude changes an exception: running the
@@ -72,12 +73,18 @@ func PreToolUse(input []byte) (*Output, error) {
 }
 
 // ponytail: matches by name at any depth, so fixtures named quality.yaml ask too; compare against cwd if that gets noisy.
+//
+// The path is read as Windows reads it, the widest reading: in any case, with
+// dots and spaces after a name dropped, and with `C:name` and `name:stream`
+// taken for the file `name`.
 func protectedFile(p string) bool {
-	if p == "" {
-		return false
+	for _, name := range strings.FieldsFunc(strings.ToLower(p), func(r rune) bool { return strings.ContainsRune(`/\:`, r) }) {
+		switch strings.TrimRight(name, ". ") {
+		case "quality.yaml", ".quality":
+			return true
+		}
 	}
-	p = strings.ReplaceAll(p, `\`, "/")
-	return path.Base(p) == "quality.yaml" || slices.Contains(strings.Split(path.Dir(p), "/"), ".quality")
+	return false
 }
 
 // readers are commands that only read the files they are given, in Bash and

@@ -313,11 +313,21 @@ func names(node syntax.Node) bool {
 	return found
 }
 
+// In $'...' a backslash starts an escape. Those that spell a character by its
+// number (`\x2e`, `\056`, `.`, `\cA`) are not worked out here: a word
+// that holds one counts as naming the path. The others stand for characters
+// no protected name holds.
+var (
+	numberedEscape = regexp.MustCompile(`\\[xuUc0-7]`)
+	escape         = regexp.MustCompile(`(?s)\\.`)
+)
+
 // namesProtected reports whether the word names a protected path, with each
 // part known only when the line runs taken as empty, and as a gap.
 func namesProtected(w *syntax.Word) bool {
 	const unknown = "\x00"
 	var b strings.Builder
+	hidden := false // a numbered escape in $'...' may spell the name
 	var add func(parts []syntax.WordPart, quoted bool)
 	add = func(parts []syntax.WordPart, quoted bool) {
 		for _, p := range parts {
@@ -325,7 +335,14 @@ func namesProtected(w *syntax.Word) bool {
 			case *syntax.Lit:
 				b.WriteString(unescape(p.Value, quoted))
 			case *syntax.SglQuoted:
-				b.WriteString(p.Value)
+				switch {
+				case !p.Dollar:
+					b.WriteString(p.Value)
+				case numberedEscape.MatchString(p.Value):
+					hidden = true
+				default:
+					b.WriteString(escape.ReplaceAllString(p.Value, unknown))
+				}
 			case *syntax.DblQuoted:
 				add(p.Parts, true)
 			case *syntax.ExtGlob:
@@ -337,7 +354,7 @@ func namesProtected(w *syntax.Word) bool {
 	}
 	add(w.Parts, false)
 	s := b.String()
-	return protectedName.MatchString(s) || protectedName.MatchString(strings.ReplaceAll(s, unknown, ""))
+	return hidden || protectedName.MatchString(s) || protectedName.MatchString(strings.ReplaceAll(s, unknown, ""))
 }
 
 // unescape takes the backslashes off as Bash does: before any character
