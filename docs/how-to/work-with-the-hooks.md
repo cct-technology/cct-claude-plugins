@@ -16,15 +16,44 @@ The prompt means Claude is about to record an exception, or to change `.quality/
 | --- | --- |
 | Runs `qk waiver add` or `qk docs-impact` | Yes |
 | Edits or writes a file under `.quality/`, or `quality.yaml` | Yes |
-| Runs a shell command that can change one of them: a redirect into it, `sed -i`, `rm`, `mv`, `cp`, `tee`, `git checkout`, `Set-Content` | Yes |
-| Runs a shell command the hook does not know, with one of them named in it: a script, `python -c`, `sh -c`, `xargs` | Yes |
-| Runs a command that can write or start a program through an option or its script, with one of them named in it: `sed`, `awk`, `sort`, `yq`, `less`, `git -c ...`, a variable set in front as in `PAGER=x git log` | Yes |
-| Reads one of them with a command that can only read: `cat`, `head`, `grep`, `ls`, `test -f`, `diff`, `git diff`, `git log`, `Get-Content` | No |
-| Records one in git: `git add`, `git commit` | No |
+| Runs a shell command that names one of them, unless it is a plain read | Yes |
+| Runs a plain read of one of them | No |
 
-A line with several commands is asked about when any command in it could change a protected path. So `test -f quality.yaml && qk init` is not asked about, and `cat quality.yaml; rm quality.yaml` is.
+### What a plain read is
 
-The hook reads the text of the command; it does not run a shell. When it cannot tell a read from a write, it asks. It can still miss a write, for example when a file name sits in a variable from an earlier command. Review of `.quality/` and `quality.yaml` at merge is the backstop: see [who approves](waive-a-finding.md#who-approves).
+A shell line that names `.quality/` or `quality.yaml` is a plain read when all of this holds:
+
+- **The command that names the path only reads, and so does every command it is piped with.** These do: `cat`, `head`, `tail`, `grep`, `rg`, `ls`, `find`, `wc`, `diff`, `jq`, `test`, `echo`, and in PowerShell `Get-Content`, `Select-String`, `Test-Path`, `Get-Item` and `Get-ChildItem`. So do `git diff`, `log`, `show`, `status` and `blame`. `git add` and `git commit` record a file without changing it, so they count too.
+- **No output goes to the path**, or to a target the hook cannot read off the text, such as a pattern.
+- **The line is plain**: commands, quotes, pipes, redirects, `;`, `&&` and `||`. A line with braces, backticks, `#` or `<` is asked about, and so is one with a backslash in Bash or an `@` in PowerShell.
+- **The command that names the path uses no `$` and no brackets**, and neither does a command it is piped with. In Bash, another command on the line may: `cat quality.yaml; git diff "$(git merge-base main HEAD)" --stat` is a plain read. In PowerShell the whole line may not.
+- **No other command on the line changes what a command name means**: `alias`, `source`, `eval`, `PATH=...`, and in PowerShell `Set-Alias` or `Import-Module`.
+
+Other commands on the line are left alone, as long as they do not name the path.
+
+So these are not asked about:
+
+```sh
+cat quality.yaml
+test -f quality.yaml && qk init --maturity silver
+git diff main -- quality.yaml
+cat .quality/waivers.yaml | grep rule | head -20
+cat quality.yaml && make docs
+```
+
+And these are:
+
+```sh
+sed -i 's/silver/bronze/' quality.yaml    # changes it
+cat new.yaml > quality.yaml               # output goes to it
+echo quality.yaml | xargs rm              # piped into a command that is no reader
+cat "$HOME/repo/quality.yaml"             # a read, but the line is not plain
+sed -n '1,5p' quality.yaml                # a read, but sed can also write
+```
+
+The last two are reads, and you are asked all the same. The hook reads the text of the command; it does not run a shell. It lets a narrow, certain shape through and asks about the rest, because a guess that is wrong lets a change through without you.
+
+It can still miss a write when the name is not in the text of the command that writes: a file name in a variable from an earlier command, a script that does the writing, or a file that carries the name to a later command. Review of `.quality/` and `quality.yaml` at merge is the backstop: see [who approves](waive-a-finding.md#who-approves).
 
 ## When Claude is sent back
 
