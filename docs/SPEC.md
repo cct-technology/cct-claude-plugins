@@ -253,6 +253,10 @@ For GitHub, provide a reusable GitHub Actions workflow `quality.yml` that consum
 ## 11. Open decisions
 
 - Plugin name and repo name (working: Quality Kit, `cct-claude-plugins`).
-- Default dependency age threshold (proposed 14 days) and licence allowlist.
-- Whether threat-model mitigations go to Linear automatically or need confirmation (proposed: confirmation).
 - Docs publishing (repo only vs a docs site).
+
+### Decided
+
+- **Dependency age** (2026-11-14, CCT-3421): a newly added dependency must be at least 14 days old, counted from the publish date of the version being added. An urgent patch needs a waiver.
+- **Licence allowlist** (2026-11-14, CCT-3421): permissive licences only: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense.
+- **Threat-model mitigations** (2026-11-14, CCT-3422): they go to Linear only after a person confirms which ones. The checklist in the threat model is the record.
