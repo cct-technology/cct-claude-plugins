@@ -13,7 +13,7 @@ Tag each threat with the one control its mitigation serves most directly. The ta
 | Signing in: sessions, expiry, a second factor | A.8.5 Secure authentication |
 | One person must not both do and approve | A.5.3 Segregation of duties |
 | Sending data to another party safely | A.5.14 Information transfer |
-| Personal data: least data, purpose, the data subject's rights | A.5.34 Privacy and protection of PII |
+| Personal data: least data, purpose, the data subject's rights | A.5.34 Privacy and protection of personal identifiable information (PII) |
 | Hiding part of the data from those who do not need it | A.8.11 Data masking |
 | Keeping data from leaving through logs, answers or exports | A.8.12 Data leakage prevention |
 | Removing data when it is no longer needed | A.8.10 Information deletion |
@@ -31,7 +31,7 @@ Tag each threat with the one control its mitigation serves most directly. The ta
 | Known flaws in what you depend on | A.8.8 Management of technical vulnerabilities |
 | Choosing and checking a supplier | A.5.19 Information security in supplier relationships |
 | What the agreement with a supplier must say | A.5.20 Addressing information security within supplier agreements |
-| Packages, models and other parts from others | A.5.21 Managing information security in the ICT supply chain |
+| Packages, models and other parts from others | A.5.21 Managing information security in the information and communication technology (ICT) supply chain |
 | Watching a supplier's service, and its changes | A.5.22 Monitoring, review and change management of supplier services |
 | A cloud or hosted service, a hosted model among them | A.5.23 Information security for use of cloud services |
 
