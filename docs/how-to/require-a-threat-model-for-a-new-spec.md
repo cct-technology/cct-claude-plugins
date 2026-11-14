@@ -2,6 +2,8 @@
 
 QK040 checks that every new spec comes with a threat model, so security is thought through when a feature is specified, not after it ships.
 
+To have Claude write the threat model for a spec, see [Write a threat model with Claude](write-a-threat-model-with-claude.md).
+
 ## Name your folders
 
 In `quality.yaml`:
