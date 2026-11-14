@@ -1,6 +1,9 @@
 # Get the qk binary
 
-Quality Kit's hooks need the `qk` binary. The plugin ships a small script, `bin/qk`, that finds the right one. Usually you do nothing: the first hook that needs `qk` downloads it.
+Quality Kit's hooks need the `qk` binary. The plugin ships a small script, `bin/qk`, that finds the right one. Once releases are public you do nothing: the first hook that needs `qk` downloads it.
+
+> [!NOTE]
+> Today you install `qk` yourself. The download needs a release that anyone can read, and there is none yet: `v0.1.0` is not tagged, and `rkvalvaa/cct-claude-plugins` is private, so `bin/qk` cannot sign in to it. See [Install qk yourself](#install-qk-yourself).
 
 ## How the plugin finds qk
 
@@ -12,13 +15,38 @@ The required version is the `version` in the plugin's `plugin.json`. `bin/qk` tr
 
 If all three fail, it prints a warning on stderr and exits 0. The check does not run and nothing is blocked. A download whose checksum does not match is refused and never cached.
 
-## Use qk on a machine with no access to GitHub
+## Install qk yourself
 
-Download the archive for your system from the [releases page](https://github.com/rkvalvaa/cct-claude-plugins/releases), for the version in `plugin.json`. Verify it against `checksums.txt`, then put `qk` on `PATH`:
+Do this before the first release, while the repository is private, or on a machine with no access to GitHub. `<version>` is the `version` in the plugin's `plugin.json`.
+
+On Windows, run the commands in Git Bash, and write `qk.exe` wherever a command names the file `qk`. The plugin looks for that name, and does not find a file named `qk`.
+
+**Before the first release**, build `qk` from a clone. This needs Go:
+
+```sh
+git clone https://github.com/rkvalvaa/cct-claude-plugins
+cd cct-claude-plugins
+go build -ldflags "-X main.version=<version>" -o qk ./cmd/qk
+```
+
+**From a release, while the repository is private**, download with `gh`, which signs in for you:
+
+```sh
+gh release download v<version> -R rkvalvaa/cct-claude-plugins -p "qk_<version>_linux_amd64.tar.gz" -p checksums.txt
+```
+
+**From a public release**, download the archive for your system and `checksums.txt` from the [releases page](https://github.com/rkvalvaa/cct-claude-plugins/releases).
+
+Verify a downloaded archive against `checksums.txt` and unpack it:
 
 ```sh
 sha256sum --ignore-missing -c checksums.txt
 tar -xzf qk_<version>_linux_amd64.tar.gz qk
+```
+
+Then move `qk` to a folder on your `PATH`, such as `~/.local/bin`, and check it:
+
+```sh
 mv qk ~/.local/bin/
 qk version
 ```

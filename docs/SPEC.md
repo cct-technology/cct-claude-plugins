@@ -252,11 +252,12 @@ For GitHub, provide a reusable GitHub Actions workflow `quality.yml` that consum
 
 ## 11. Open decisions
 
-- Plugin name and repo name (working: Quality Kit, `cct-claude-plugins`).
-- Docs publishing (repo only vs a docs site).
+None.
 
 ### Decided
 
+- **Names** (2026-11-14, CCT-3424): the working names are final. Plugin: Quality Kit (`quality-kit`). Marketplace and repo: `cct-claude-plugins`. CLI: `qk`. Manifest: `quality.yaml`.
+- **Docs publishing** (2026-11-14, CCT-3423): the docs live in the repo only, as Markdown under `docs/`. No docs site.
 - **Dependency age** (2026-11-14, CCT-3421): a newly added dependency must be at least 14 days old, counted from the publish date of the version being added. An urgent patch needs a waiver.
 - **Licence allowlist** (2026-11-14, CCT-3421): permissive licences only: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense.
 - **Threat-model mitigations** (2026-11-14, CCT-3422): they go to Linear only after a person confirms which ones. The checklist in the threat model is the record.
