@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -21,24 +22,28 @@ func IsManifest(file string) bool {
 // Paths, git URLs, workspace members and the platform itself are left out.
 // A file that is not a manifest, or cannot be read as one, declares nothing.
 func Declared(file string, data []byte) []Package {
+	var pkgs []Package
 	name := path.Base(file)
 	switch {
 	case name == "package.json":
-		return npmDeps(data)
+		pkgs = npmDeps(data)
 	case name == "go.mod":
-		return goDeps(data)
+		pkgs = goDeps(data)
 	case name == "composer.json":
-		return composerDeps(data)
+		pkgs = composerDeps(data)
 	case name == "Cargo.toml":
-		return cargoDeps(data)
+		pkgs = cargoDeps(data)
 	case name == "pyproject.toml":
-		return pyprojectDeps(data)
+		pkgs = pyprojectDeps(data)
 	case name == "Pipfile":
-		return pipfileDeps(data)
+		pkgs = pipfileDeps(data)
 	case strings.HasPrefix(name, "requirements") && strings.HasSuffix(name, ".txt"):
-		return requirementsDeps(data)
+		pkgs = requirementsDeps(data)
 	}
-	return nil
+	// By name, so findings come in the same order on every run: a JSON
+	// manifest is read into a map, which has no order.
+	slices.SortStableFunc(pkgs, func(a, b Package) int { return strings.Compare(a.Name, b.Name) })
+	return pkgs
 }
 
 // jsonGroups returns the name-to-spec pairs under keys of a JSON manifest.

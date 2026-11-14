@@ -90,6 +90,9 @@ func Locked(file string, data []byte) map[string][]string {
 			}
 		}
 	}
+	for _, versions := range held {
+		slices.Sort(versions) // the same order on every run, whatever order the file was read in
+	}
 	return held
 }
 

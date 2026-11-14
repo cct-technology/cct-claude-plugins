@@ -160,3 +160,12 @@ func TestChangedFindsNewNamesAndNewVersions(t *testing.T) {
 		})
 	}
 }
+
+func TestLockedGivesAVersionListInTheSameOrderEveryTime(t *testing.T) {
+	lock := []byte(`{"lockfileVersion": 3, "packages": {"node_modules/react": {"version": "18.3.1"}, "a/node_modules/react": {"version": "19.0.0"}, "b/node_modules/react": {"version": "17.0.2"}, "c/node_modules/react": {"version": "16.14.0"}}}`)
+	for range 50 {
+		if got := Locked("package-lock.json", lock)["react"]; !slices.IsSorted(got) || len(got) != 4 {
+			t.Fatalf("Locked gave %v, want the four versions in order", got)
+		}
+	}
+}

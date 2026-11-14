@@ -152,3 +152,18 @@ func TestNamedVersion(t *testing.T) {
 		}
 	}
 }
+
+// Findings come out in the order the dependencies do. A JSON manifest is read
+// into a map, so without sorting that order would change from run to run.
+func TestDeclaredIsInNameOrderEveryTime(t *testing.T) {
+	manifest := []byte(`{"dependencies": {"zod": "3", "axios": "1", "react": "18", "lodash": "4", "express": "4", "chalk": "5", "uuid": "9", "debug": "4"}}`)
+	for range 50 {
+		var got []string
+		for _, p := range Declared("package.json", manifest) {
+			got = append(got, p.Name)
+		}
+		if !slices.IsSorted(got) {
+			t.Fatalf("Declared gave %v, want the names in order", got)
+		}
+	}
+}
