@@ -26,6 +26,16 @@ const askReason = "Quality Kit: this records or changes an exception to a qualit
 	"Approve only if you agree with the reason given. " +
 	"If this is denied or no one can approve it, stop and tell the user; do not try another way."
 
+// notPlainReason is for a shell line that names a protected path and is not
+// plainly a read. Claude reads it when nobody approves: without the advice it
+// takes a refused `git tag; cat quality.yaml` for a ban on reading, and gives
+// the task up.
+const notPlainReason = "Quality Kit: this command names quality.yaml or .quality/ and is not plainly a read, " +
+	"so it may change an exception to a quality check (a waiver, a docs-impact note, or a check's mode). " +
+	"A person must approve it. Approve only if you agree with what it changes. " +
+	"Claude: if you only meant to read, run the read as a command of its own, or use the Read tool. " +
+	"If you meant to change it and this is denied or no one can approve it, stop and tell the user; do not try another way."
+
 var (
 	// exceptionCommand: qk waiver add / qk docs-impact, however qk is invoked.
 	exceptionCommand = regexp.MustCompile(`(^|[\s"'/\\&;|(])(?i:qk(\.exe)?)["']?\s+(waiver\s+add|docs-impact)\b`)
@@ -68,9 +78,11 @@ func PreToolUse(input []byte) (*Output, error) {
 	if in.ToolName == "PowerShell" {
 		mayChange = powershellMayChange
 	}
-	if exceptionCommand.MatchString(t.Command) || mayChange(t.Command) ||
-		protectedFile(t.FilePath) || protectedFile(t.NotebookPath) {
+	switch {
+	case exceptionCommand.MatchString(t.Command), protectedFile(t.FilePath), protectedFile(t.NotebookPath):
 		return &Output{Decision{"PreToolUse", "ask", askReason}}, nil
+	case mayChange(t.Command):
+		return &Output{Decision{"PreToolUse", "ask", notPlainReason}}, nil
 	}
 	return nil, nil
 }
@@ -106,8 +118,9 @@ var readers = map[string]bool{
 }
 
 // gitReads are git subcommands that leave the files in the working tree as they are.
-// add and commit record a file; they do not change it.
+// add and commit record a file; they do not change it. tag and branch name commits.
 var gitReads = map[string]bool{
+	"tag": true, "branch": true,
 	"diff": true, "log": true, "show": true, "status": true, "blame": true, "grep": true, "describe": true,
 	"ls-files": true, "ls-tree": true, "cat-file": true, "rev-parse": true, "merge-base": true,
 	"check-attr": true, "check-ignore": true, "shortlog": true, "add": true, "commit": true,
