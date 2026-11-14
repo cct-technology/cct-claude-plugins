@@ -59,7 +59,7 @@ The last three are reads, and you are asked all the same. A hook that reads text
 - **Bash lines are parsed**, with the parser of [`shfmt`](https://github.com/mvdan/sh), so quotes, escapes and comments are read as Bash reads them. A line the parser cannot read is asked about. The Bash tool may run zsh, as on macOS: the line is still read as Bash, which is one reason words outside quotes are held to plain characters.
 - **PowerShell lines are not parsed.** The same rules are applied to the text of the line.
 
-The hook runs nothing. It can miss a write when the name is not written on the line: a file name in a variable from an earlier command, a pattern such as `*.yaml`, a script that does the writing, or another name for the same file, such as a link or a Windows short name. The name counts in any case, so `QUALITY.YAML` is asked about too. Review of `.quality/` and `quality.yaml` at merge is the backstop: see [who approves](waive-a-finding.md#who-approves).
+The hook runs nothing. It can miss a write when the name is not written on the line: a file name in a variable from an earlier command, a pattern such as `*.yaml`, a script that does the writing, or another name for the same file, such as a link. The name counts in any case, so `QUALITY.YAML` is asked about too, and so is the usual Windows short name, `QUALIT~1.YAM`. Review of `.quality/` and `quality.yaml` at merge is the backstop: see [who approves](waive-a-finding.md#who-approves).
 
 ## When Claude is sent back
 

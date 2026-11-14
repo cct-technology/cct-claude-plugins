@@ -162,6 +162,10 @@ func TestPreToolUseAsksAPersonForExceptions(t *testing.T) {
 		// Windows and macOS find the file under these names too.
 		{"a name in another case", shell("Bash", `rm QUALITY.YAML`)},
 		{"PowerShell name in another case", shell("PowerShell", `Remove-Item QUALITY.YAML`)},
+		{"PowerShell short name of the manifest", shell("PowerShell", `Remove-Item QUALIT~1.YAM`)},
+		{"PowerShell output to the short name", shell("PowerShell", `Get-Content other.yaml > QUALIT~1.YAM`)},
+		{"short name of the folder", shell("Bash", `rm QUALIT~1/waivers.yaml`)},
+		{"Edit the manifest by its short name", file("Edit", `D:\repo\QUALIT~1.YAM`)},
 		{"the folder with a dot after it", shell("Bash", `rm -r .quality./`)},
 		{"PowerShell folder with a dot after it", shell("PowerShell", `Remove-Item .quality.\waivers.yaml`)},
 		{"PowerShell output to a drive-relative path", shell("PowerShell", `Get-Content other.yaml > C:quality.yaml`)},

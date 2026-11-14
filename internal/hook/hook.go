@@ -33,7 +33,10 @@ var (
 	// before anything that is not part of a file name, as in `>&quality.yaml`.
 	// In any case, and with dots after the folder's name: Windows and macOS
 	// find the file as QUALITY.YAML, and Windows finds the folder as `.quality.`.
-	protectedName = regexp.MustCompile(`(?i)(^|[^\w.-])(\.quality\.*([^\w.-]|$)|quality\.yaml\b)`)
+	// ponytail: of the short names Windows may give the two, only the usual
+	// form (QUALIT~1.YAM, QUALIT~1) is known; the hashed form it uses after
+	// four clashes is not, nor is a link. Resolve the path if that matters.
+	protectedName = regexp.MustCompile(`(?i)(^|[^\w.-])(\.quality\.*([^\w.-]|$)|quality\.yaml\b|qualit~\d)`)
 )
 
 // PreToolUse asks a person before Claude changes an exception: running the
@@ -79,8 +82,8 @@ func PreToolUse(input []byte) (*Output, error) {
 // taken for the file `name`.
 func protectedFile(p string) bool {
 	for _, name := range strings.FieldsFunc(strings.ToLower(p), func(r rune) bool { return strings.ContainsRune(`/\:`, r) }) {
-		switch strings.TrimRight(name, ". ") {
-		case "quality.yaml", ".quality":
+		name = strings.TrimRight(name, ". ")
+		if name == "quality.yaml" || name == ".quality" || strings.HasPrefix(name, "qualit~") {
 			return true
 		}
 	}
