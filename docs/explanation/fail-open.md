@@ -16,6 +16,7 @@ The reason is trust. A tool that stops your work because its own download failed
 | A hook fails in any other way | The same: a warning, exit 0. A `qk hook` command never exits with an error, because Claude Code reads one as a block. |
 | A check crashes | That check is `skipped` with `rule crashed: ...`. The other checks run. |
 | A tool a check needs is not installed, such as `oasdiff` | The check is `skipped` and says how to install the tool. |
+| A package registry cannot be reached | QK060 is `skipped` and names the package it could not ask about. |
 | There is no git repository, or no base to compare with | Checks that need one are `skipped` with the reason. |
 | `quality.yaml` is missing | Every check runs advisory with defaults. Nothing blocks. |
 | In CI, `qk` cannot be downloaded or cannot run | The job warns and passes. The pull request comment says `qk` did not run. |
@@ -26,7 +27,7 @@ Failing open must not look like passing. A check that did not run is reported as
 
 So read the comment, not only the green tick. A job that passed because `qk` did not run says so.
 
-Two things are left unsaid when Claude finishes, so that the message after every turn stays short. The slow checks (QK020) do not run then and are not named: `qk check --full` and CI run them. And in a repository without `quality.yaml`, the line saying so is left out.
+Two things are left unsaid when Claude finishes, so that the message after every turn stays short. The slow checks (QK020, QK060) do not run then and are not named: `qk check --full` and CI run them. And in a repository without `quality.yaml`, the line saying so is left out.
 
 ## Where it stops
 

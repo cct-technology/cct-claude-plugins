@@ -26,7 +26,7 @@ It works in any git repository with no configuration. Without a `quality.yaml`, 
 | QK020 | Generated files equal their generator's output | silver | [Keep generated docs current](docs/how-to/keep-docs-in-step.md#keep-generated-docs-current) |
 | QK030 | No breaking OpenAPI changes (needs `oasdiff`) | silver | [Catch breaking API changes](docs/how-to/catch-breaking-api-changes.md) |
 | QK040 | A new spec has a threat model | gold | [Require a threat model](docs/how-to/require-a-threat-model-for-a-new-spec.md) |
-| QK060 | A new dependency exists in its registry, is at least 14 days old, is not deprecated and has an allowed licence | | Coming (CCT-3436) |
+| QK060 | New and upgraded dependencies exist in their registry, are at least 14 days old, are maintained and have an allowed licence | silver | [Check new and upgraded dependencies](docs/how-to/check-dependencies.md) |
 | QK061 | Dependencies have a lockfile that changes with them | silver | [Keep lockfiles in step](docs/how-to/keep-lockfiles-in-step.md) |
 | QK100 | Waivers are valid, owned and not expired | silver | [Waive a finding](docs/how-to/waive-a-finding.md) |
 | QK110 | Every top-level path has a code owner | gold | [Give every path a code owner](docs/how-to/give-every-path-a-code-owner.md) |
@@ -74,7 +74,7 @@ A problem with Quality Kit itself never blocks: see [why Quality Kit fails open]
 | `qk waiver add <rule>` | Records an agreed, owned, time-limited exception that a person approved. | [Waive a finding](docs/how-to/waive-a-finding.md) |
 | `qk docs-impact none` | Records a person's approval that a change needs no docs. | [Keep docs in step](docs/how-to/keep-docs-in-step.md#when-a-change-needs-no-docs) |
 | `qk version` | Prints the `qk` version and the `quality.yaml` version it reads. | |
-| `qk deps verify` | Coming (CCT-3436): runs the QK060 checks for one package. | |
+| `qk deps verify <ecosystem> <name>` | Runs the QK060 checks for one package, before you add or upgrade it. | [Check one package](docs/how-to/check-dependencies.md#check-one-package-before-you-add-it) |
 
 ### CI
 

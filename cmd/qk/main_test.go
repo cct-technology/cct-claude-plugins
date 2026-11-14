@@ -4,13 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
 )
@@ -985,5 +989,93 @@ func TestInitUnknownAnswerIsAUsageErrorAndWritesNothing(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir("."); len(entries) > 0 {
 		t.Errorf("wrote %d files before checking the answers", len(entries))
+	}
+}
+
+// fakeRegistry points `qk deps verify` at a registry that knows three npm
+// packages, and answers 404 for any other.
+func fakeRegistry(t *testing.T) {
+	t.Helper()
+	doc := func(version, published, licence string) string {
+		return `{"dist-tags": {"latest": "` + version + `"}, "time": {"` + version + `": "` + published + `"}, "versions": {"` + version + `": {"license": "` + licence + `"}}}`
+	}
+	pages := map[string]string{
+		"/left-pad":     doc("1.3.0", "2018-04-09T01:10:45Z", "MIT"),
+		"/@scope%2Fpkg": doc("2.0.0", "2020-01-01T00:00:00Z", "GPL-3.0-only"),
+
+		"/example.com/lib/@latest":       `{"Version": "v1.2.0", "Time": "2024-03-01T00:00:00Z"}`,
+		"/example.com/lib/@v/v1.2.0.mod": "module example.com/lib",
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch body, ok := pages[r.URL.EscapedPath()]; {
+		case r.URL.Path == "/flaky":
+			http.Error(w, "down", http.StatusBadGateway)
+		case !ok:
+			http.NotFound(w, r)
+		default:
+			_, _ = w.Write([]byte(body))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	real := registry
+	t.Cleanup(func() { registry = real })
+	registry = &deps.Client{NPM: srv.URL, GoProxy: srv.URL, HTTP: srv.Client(), Now: time.Now}
+}
+
+func TestDepsVerifyPassesAGoodPackage(t *testing.T) {
+	fakeRegistry(t)
+
+	code, out, errOut := runQK(t, rules.All(), "deps", "verify", "npm", "left-pad@1.3.0")
+
+	if code != 0 || errOut != "" || !strings.Contains(out, "ok: `left-pad` (npm) 1.3.0, published 2018-04-09, licence MIT") {
+		t.Errorf("exit code = %d, stdout = %q, stderr = %q", code, out, errOut)
+	}
+}
+
+func TestDepsVerifyExitsOneForAFinding(t *testing.T) {
+	fakeRegistry(t)
+
+	for args, want := range map[string]string{
+		"npm reakt-domm":       "`reakt-domm` (npm) does not exist in the registry",
+		"npm @scope/pkg@2.0.0": "`@scope/pkg` (npm) 2.0.0 has the licence `GPL-3.0-only`, which is not on the allowed list",
+	} {
+		code, out, errOut := runQK(t, rules.All(), append([]string{"deps", "verify"}, strings.Fields(args)...)...)
+		if code != 1 || errOut != "" || !strings.Contains(out, want) {
+			t.Errorf("qk deps verify %s: exit code = %d, stdout = %q, stderr = %q; want 1 and %q", args, code, out, errOut, want)
+		}
+	}
+}
+
+// A registry that cannot be asked is not a finding, so it must not block an install.
+func TestDepsVerifyExitsZeroWhenTheRegistryCannotBeAsked(t *testing.T) {
+	fakeRegistry(t)
+
+	code, out, _ := runQK(t, rules.All(), "deps", "verify", "npm", "flaky")
+
+	if code != 0 || !strings.Contains(out, "skipped: could not ask the registry about `flaky` (npm)") {
+		t.Errorf("exit code = %d, stdout = %q; want 0 and a skipped line", code, out)
+	}
+}
+
+func TestDepsVerifySaysWhatItCouldNotCheck(t *testing.T) {
+	fakeRegistry(t)
+
+	code, out, _ := runQK(t, rules.All(), "deps", "verify", "go", "example.com/lib")
+
+	if code != 0 || !strings.Contains(out, "ok: `example.com/lib` (go) v1.2.0, published 2024-03-01") ||
+		!strings.Contains(out, "licence not checked: this registry holds no licence data") {
+		t.Errorf("exit code = %d, stdout = %q; want 0, ok and the note about the licence", code, out)
+	}
+}
+
+func TestDepsVerifyUsageErrors(t *testing.T) {
+	for _, args := range [][]string{
+		{"deps", "verify", "left-pad"},
+		{"deps", "verify", "gems", "rails"},
+		{"deps", "verify", "npm", "@1.0.0"},
+	} {
+		if code, _, errOut := runQK(t, rules.All(), args...); code != 2 || errOut == "" {
+			t.Errorf("qk %v: exit code = %d, stderr = %q; want 2 and a message", args, code, errOut)
+		}
 	}
 }

@@ -76,6 +76,10 @@ Without `oasdiff`, QK030 is skipped and the comment says so. To have [breaking A
 
 This repository's own CI does the same.
 
+### New and upgraded dependencies
+
+QK060 needs no setup. It asks the public package registries from the runner about each [dependency a pull request adds or upgrades](check-dependencies.md). If a registry cannot be reached, the check is skipped and the comment says so.
+
 ## Show findings in code scanning
 
 ```yaml

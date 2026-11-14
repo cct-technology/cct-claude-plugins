@@ -21,7 +21,7 @@ Choosing a mode per check is more than most teams want to do. So `quality.yaml` 
 | Maturity | Meant for | What blocks |
 | --- | --- | --- |
 | `bronze` | Repositories that existed before Quality Kit | Only a broken `quality.yaml`. Every other check warns. |
-| `silver` | New services | Also docs, contracts, generated files, lockfiles and waivers. |
+| `silver` | New services | Also docs, contracts, generated files, dependencies, lockfiles and waivers. |
 | `gold` | Client-facing or regulated services | Every check. |
 
 Each check has a level from which it blocks. The [rule reference](../reference/rules.md) gives it for every rule, as "Enforced by default at".
@@ -63,4 +63,4 @@ Use a waiver when you can. A check set to `advisory` stays quiet about every new
 
 ## Slow checks
 
-Some checks are slow, because they run your generators. They run with `qk check --full` and in CI, and not when Claude finishes. A slow check can be enforced and still not stop Claude in a session: CI is where it blocks. See [run the slow checks](../how-to/run-qk-check.md#run-the-slow-checks).
+Some checks are slow, because they run your generators (QK020) or ask the package registries (QK060). They run with `qk check --full` and in CI, and not when Claude finishes. A slow check can be enforced and still not stop Claude in a session: CI is where it blocks. See [run the slow checks](../how-to/run-qk-check.md#run-the-slow-checks).

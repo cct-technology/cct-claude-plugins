@@ -18,6 +18,7 @@ The checks ask questions a program can answer for certain:
 - Does this file equal what its generator writes? (QK020)
 - Does `oasdiff` find a breaking change between the base and now? (QK030)
 - Does this new spec have a threat model with its name? (QK040)
+- Was this version of a dependency published at least 14 days ago? (QK060)
 
 `qk` does not read a doc and judge whether it is good. It checks that the doc was touched, exists, or matches. That is a weaker question than "is it right", and it is one with a certain answer.
 
