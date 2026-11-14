@@ -3,83 +3,61 @@ package hook
 import (
 	"regexp"
 	"strings"
+	"unicode"
 )
-
-// psNotPlain holds the characters that make a PowerShell line more than plain
-// commands, quotes, pipes and redirects: variables, groups, blocks, splatting
-// and here-strings, comments, the escape character, and the typographic
-// quotes PowerShell reads as quotes. There is no parser for PowerShell here,
-// so a line that holds one and names a protected path asks.
-const psNotPlain = "`$(){}<#@" + "‘’‚‛“”„"
 
 var (
 	// psRedirect: where a command sends its output: `> file`, `>> file`, `2> file`. The first group is an opening quote.
 	psRedirect = regexp.MustCompile(`>+&?\s*(["']?)([^\s"'<>|;&]*)`)
 	// toNull: PowerShell's way to discard a stream, the one use of `$` that is let through.
 	toNull = regexp.MustCompile(`(?i)>\s*\$null\b`)
+	// newLines: PowerShell ends a statement at a carriage return as at a new line.
+	newLines = strings.NewReplacer("\r\n", "\n", "\r", "\n")
 )
 
-// psStateChangers are commands that can change what a later command on the
-// line runs: they load code or set names. Aliases, functions and variables
-// can also be set through their drives with general commands, so a command
-// that mentions one of those counts as well (psChangesState).
-var psStateChangers = map[string]bool{
-	"import-module": true, "ipmo": true, "invoke-expression": true, "iex": true, ".": true,
-	"set-variable": true, "sv": true, "new-variable": true, "nv": true,
-	"set-item": true, "si": true, "new-item": true, "ni": true, "function": true, "filter": true,
-}
+// psBystanders may stand on a line beside a read: they change no file and no
+// name PowerShell looks up. They may not name the protected path themselves.
+var psBystanders = map[string]bool{"qk": true, "cd": true, "set-location": true, "sl": true, "get-command": true, "gcm": true}
 
 // powershellMayChange reports whether a PowerShell line that names .quality/
-// or quality.yaml could change it. Only a plain read is left alone:
+// or quality.yaml could change it. There is no parser for PowerShell here, so
+// only a narrow shape of text is let through:
 //
-//   - the line is nothing but commands, quotes, pipes and redirects;
-//   - in each pipeline that names the path, every command is one known to
-//     read, and none sends its output to the path or to a target that cannot
-//     be read off the text;
-//   - no other command on the line changes what a command name means.
+//   - outside quotes the line holds only letters, digits, spaces and
+//     `_ . / \ : , % + = * ? ~ - > & | ;`: no variables, groups, blocks,
+//     comments or escapes;
+//   - every command on the line is one known to read, or a bystander that
+//     does not name the path;
+//   - no output goes to the path, or to a target that cannot be read off the
+//     text.
 //
-// Everything else asks, so some reads ask: `Get-Content $path`, a `#` comment.
+// Everything else asks, so some reads ask: `Get-Content $path`, a read beside
+// another command.
 func powershellMayChange(line string) bool {
 	if !protectedName.MatchString(line) {
 		return false
 	}
-	line = toNull.ReplaceAllString(line, "> nul")
-	if strings.ContainsAny(line, psNotPlain) {
-		return true
-	}
+	line = newLines.Replace(toNull.ReplaceAllString(line, "> nul"))
 	pipelines, plain := psCommands(line)
 	if !plain {
 		return true
 	}
-	named := false
 	for _, pipeline := range pipelines {
-		names := protectedName.MatchString(strings.Join(pipeline, " | "))
-		named = named || names
 		for _, cmd := range pipeline {
 			words := strings.Fields(cmd)
 			args := make([]string, 0, len(words))
 			for _, w := range words[1:] {
 				args = append(args, strings.Trim(w, `"'`)) // an option is an option in quotes too
 			}
-			if psChangesState(cmd, words[0]) || names && (psWritesTo(cmd) || !readOnly(words[0], args, true, true)) {
+			if psWritesTo(cmd) {
 				return true
 			}
-		}
-	}
-	return !named // the line names the path, yet no command does: it cannot be told apart
-}
-
-// psChangesState reports whether the command can change what a later
-// command's name means: `Set-Alias cat Remove-Item`, `Import-Module x`,
-// `Copy-Item function:Remove-Item function:cat`.
-func psChangesState(cmd, name string) bool {
-	if psStateChangers[strings.ToLower(name)] {
-		return true
-	}
-	lower := strings.ToLower(cmd)
-	for _, drive := range []string{"alias", "function:", "variable:", "env:"} {
-		if strings.Contains(lower, drive) {
-			return true
+			if readOnly(words[0], args, true) {
+				continue
+			}
+			if !psBystanders[strings.ToLower(words[0])] || protectedName.MatchString(cmd) {
+				return true
+			}
 		}
 	}
 	return false
@@ -94,20 +72,21 @@ func psWritesTo(cmd string) bool {
 		if quote == "" && descriptor.MatchString(target) {
 			continue
 		}
-		if quote != "" || target == "" || strings.ContainsAny(target, "*?[%") || protectedFile(target) {
+		if quote != "" || target == "" || strings.ContainsAny(target, "*?") || protectedFile(target) {
 			return true
 		}
 	}
 	return false
 }
 
-// psCommands splits a plain PowerShell line into pipelines, at `;`, a new
-// line, `&`, `&&` and `||`, and each pipeline into its commands, at `|`. Text
-// in quotes stays together. With the characters in psNotPlain ruled out
-// beforehand, a quote ends at the next quote of its kind.
+// psCommands splits a PowerShell line into pipelines, at `;`, a new line,
+// `&`, `&&` and `||`, and each pipeline into its commands, at `|`. Text in
+// quotes stays together and is taken as it is.
 //
 // plain is false where this does not vouch for how PowerShell reads the line:
-// a quote that opens in the middle of a word, and a quote left open.
+// a character outside quotes that is not on the short list, a quote that
+// opens in the middle of a word or is left open, a typographic quote (which
+// PowerShell reads as a quote), and a `$` or a backtick inside double quotes.
 func psCommands(line string) (pipelines [][]string, plain bool) {
 	var (
 		pipeline []string
@@ -137,9 +116,13 @@ func psCommands(line string) (pipelines [][]string, plain bool) {
 	for i, r := range rs {
 		prev, next := at(i-1), at(i+1)
 		switch {
+		case strings.ContainsRune("‘’‚‛“”„", r):
+			return nil, false
 		case quote != 0:
 			if r == quote {
 				quote = 0
+			} else if quote == '"' && (r == '$' || r == '`') {
+				return nil, false
 			}
 			cur.WriteRune(r)
 		case r == '\'' || r == '"':
@@ -156,8 +139,10 @@ func psCommands(line string) (pipelines [][]string, plain bool) {
 			end()
 		case r == '|':
 			endCommand()
-		default:
+		case unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune(" \t_./\\:,%+=*?~->&", r):
 			cur.WriteRune(r)
+		default:
+			return nil, false
 		}
 	}
 	end()

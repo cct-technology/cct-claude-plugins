@@ -105,10 +105,9 @@ var gitReads = map[string]bool{
 
 // readOnly reports whether a command with this name and these arguments is
 // known to only read. The name is as written: `./cat` and `C:\tools\cat.exe`
-// are whatever sits at that path, so only a bare name counts. certain is
-// false when an argument is not known word for word, as with `$x`; the
-// commands judged by their options then do not count as readers.
-func readOnly(name string, args []string, certain, powershell bool) bool {
+// are whatever sits at that path, so only a bare name counts. The arguments
+// are known word for word: git, find and rg are judged by their options.
+func readOnly(name string, args []string, powershell bool) bool {
 	if strings.ContainsAny(name, `/\`) {
 		return false
 	}
@@ -123,12 +122,12 @@ func readOnly(name string, args []string, certain, powershell bool) bool {
 		// Options that write a file or name a program for git to run: --output,
 		// --ext-diff, -O and --open-files-in-pager. git takes a long option
 		// shortened, so the shortest forms that cannot mean another are matched.
-		return certain && gitReads[gitSubcommand(args)] && !slices.Contains(args, "-c") &&
+		return gitReads[gitSubcommand(args)] && !slices.Contains(args, "-c") &&
 			!has("--ou", "--ext", "-O", "--op")
 	case "find":
-		return certain && !has("-delete", "-exec", "-ok", "-fprint", "-fls")
+		return !has("-delete", "-exec", "-ok", "-fprint", "-fls")
 	case "rg":
-		return certain && !has("--pre", "--hostname-bin")
+		return !has("--pre", "--hostname-bin")
 	case "test", "[":
 		return !powershell // in PowerShell `[` opens a type, as in [IO.File]
 	}

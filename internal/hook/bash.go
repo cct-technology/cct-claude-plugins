@@ -3,139 +3,285 @@ package hook
 import (
 	"regexp"
 	"strings"
+	"unicode"
 
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// stateChangers are shell builtins that can change what a later command on
-// the line runs or which file it gets: they define names, load or run code,
-// change where commands are looked up, or set variables. The last three are
-// zsh's: the Bash tool runs the user's shell, and the line is read as Bash.
-var stateChangers = map[string]bool{
-	"alias": true, "source": true, ".": true, "eval": true, "exec": true, "hash": true, "enable": true,
-	"trap": true, "read": true, "mapfile": true, "readarray": true, "getopts": true,
-	"autoload": true, "zmodload": true, "emulate": true,
-}
-
-// descriptor: the target of a redirect to another stream, as in `2>&1` and `>&-`.
-var descriptor = regexp.MustCompile(`^(\d+|-)$`)
-
 // bashMayChange reports whether a Bash line could change .quality/ or
-// quality.yaml. It parses the line and asks nothing only when:
+// quality.yaml. A line that names neither is no concern of this hook. One
+// that does is let through only when it is plain reading (see plainStmt);
+// everything else asks.
 //
-//   - no word names a protected path, or
-//   - every command that gets the name, as an argument, through a
-//     substitution or down a pipe, is one known to only read; no output is
-//     sent to the path or to a target that is not known word for word; and
-//     nothing on the line can change what a command means or carry the name
-//     to another command: no assignment, declaration, function, `eval`,
-//     `source`, `alias` and the like, and no variable in a command that is
-//     not a reader.
+// Earlier versions followed where the name could go: arguments,
+// substitutions, pipes, variables. Reviews kept finding one more way, so this
+// lists what is allowed, not what is dangerous.
 //
 // A line that cannot be read as Bash asks when its text names the path, and
 // so does one the parser trips over: qk turns a panic in a hook into a
 // warning, which would let the line through.
 func bashMayChange(line string) (ask bool) {
+	named := protectedName.MatchString(line)
 	defer func() {
 		if recover() != nil {
-			ask = protectedName.MatchString(line)
+			ask = named
 		}
 	}()
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(line), "")
 	if err != nil {
-		return protectedName.MatchString(line)
+		return named
 	}
-	if !names(file) {
+	// The name may be spelled so that the text alone does not show it: `q""uality.yaml`.
+	if !named && !names(file) {
 		return false
 	}
-
-	// Down a pipe, the name can reach every command of the pipeline.
-	fed := map[*syntax.CallExpr]bool{}
-	syntax.Walk(file, func(n syntax.Node) bool {
-		if b, ok := n.(*syntax.BinaryCmd); ok && (b.Op == syntax.Pipe || b.Op == syntax.PipeAll) && names(b) {
-			syntax.Walk(b, func(n syntax.Node) bool {
-				if c, ok := n.(*syntax.CallExpr); ok {
-					fed[c] = true
-				}
-				return true
-			})
+	for _, s := range file.Stmts {
+		if !plainStmt(s) {
+			return true
 		}
-		return true
-	})
-
-	syntax.Walk(file, func(n syntax.Node) bool {
-		switch n := n.(type) {
-		case *syntax.FuncDecl, *syntax.DeclClause:
-			ask = true
-		case *syntax.ForClause:
-			if loop, ok := n.Loop.(*syntax.WordIter); ok {
-				for _, item := range loop.Items {
-					ask = ask || names(item) // the loop variable would carry the name
-				}
-			}
-		case *syntax.CaseClause:
-			ask = ask || names(n.Word)
-		case *syntax.Stmt:
-			for _, r := range n.Redirs {
-				ask = ask || writesProtected(r)
-			}
-			if call, ok := n.Cmd.(*syntax.CallExpr); ok {
-				ask = ask || !plainRead(call, names(n) || fed[call])
-			}
-		}
-		return !ask
-	})
-	return ask
+	}
+	return false
 }
 
-// plainRead judges one simple command. gets is whether a protected name
-// reaches it: in its own words, its redirects, a substitution, or down a pipe.
-func plainRead(call *syntax.CallExpr, gets bool) bool {
-	if len(call.Assigns) > 0 || len(call.Args) == 0 {
-		return false // `NAME=value`: alone it sets a variable, in front of a command it can change what the command runs
+// plainStmt reports whether the statement is plain reading: commands from a
+// short list, with words written out in full, joined by `;`, `&&`, `||`, `|`,
+// `if`, `( )` and `{ }`. No variables, no substitutions, no assignments, no
+// loops, no functions.
+func plainStmt(s *syntax.Stmt) bool {
+	if s.Coprocess || s.Disown {
+		return false
 	}
-	name, ok := literal(call.Args[0])
-	if !ok || stateChangers[name] {
-		return false // a name worked out when the line runs may be anything
-	}
-	args, certain := make([]string, 0, len(call.Args)-1), true
-	for _, w := range call.Args[1:] {
-		arg, ok := literal(w)
-		args, certain = append(args, arg), certain && ok
-	}
-	if name == "printf" && len(call.Args) > 1 {
-		if first, ok := literal(call.Args[1]); !ok || strings.HasPrefix(first, "-v") {
-			return false // printf -v sets a variable
+	for _, r := range s.Redirs {
+		if !plainRedirect(r) {
+			return false
 		}
 	}
-	if readOnly(name, args, certain, false) {
+	switch c := s.Cmd.(type) {
+	case nil: // only redirects
 		return true
+	case *syntax.CallExpr:
+		return plainCall(c)
+	case *syntax.BinaryCmd: // && || | |&
+		return plainStmt(c.X) && plainStmt(c.Y)
+	case *syntax.Block:
+		return plainStmts(c.Stmts)
+	case *syntax.Subshell:
+		return plainStmts(c.Stmts)
+	case *syntax.IfClause:
+		for ; c != nil; c = c.Else {
+			if !plainStmts(c.Cond) || !plainStmts(c.Then) {
+				return false
+			}
+		}
+		return true
+	case *syntax.TestClause:
+		return plainTest(c.X)
+	case *syntax.TimeClause:
+		return c.Stmt == nil || plainStmt(c.Stmt)
 	}
-	// Not a reader. It may stand on the line when the name cannot reach it:
-	// not in its words, not down a pipe, and not through a variable such as
-	// $_, which holds the last word of the command before.
-	return !gets && !hasVariable(call)
+	return false
 }
 
-// writesProtected reports whether the redirect sends output to a protected
-// path, or to a target that is not known word for word.
-func writesProtected(r *syntax.Redirect) bool {
+func plainStmts(stmts []*syntax.Stmt) bool {
+	for _, s := range stmts {
+		if !plainStmt(s) {
+			return false
+		}
+	}
+	return true
+}
+
+// bystanders may stand on a line beside a read: they change no file, and no
+// name the shell looks up. They may not name the protected path themselves.
+// qk's commands that record an exception are caught by exceptionCommand.
+var bystanders = map[string]bool{"qk": true, "cd": true, "which": true, "type": true, "false": true, ":": true}
+
+// testOperators are the options `test`, `[` and `[[` may be given: file and
+// string tests. The others compare numbers or look at a variable, and for
+// those Bash works their operand out as an expression, which can run a command.
+var testOperators = map[string]bool{
+	"-e": true, "-f": true, "-d": true, "-r": true, "-w": true, "-x": true, "-s": true, "-L": true, "-h": true,
+	"-z": true, "-n": true, "-a": true, "-o": true,
+}
+
+// plainCall reports whether the simple command is a reader, or a bystander
+// that does not name the path, with every word written out in full.
+func plainCall(c *syntax.CallExpr) bool {
+	if len(c.Assigns) > 0 || len(c.Args) == 0 {
+		return false
+	}
+	words := make([]string, len(c.Args))
+	for i, w := range c.Args {
+		word, ok := plainWord(w)
+		if !ok {
+			return false
+		}
+		words[i] = word
+	}
+	name, args := words[0], words[1:]
+	switch {
+	case name == "test" || name == "[":
+		for _, a := range args {
+			if strings.HasPrefix(a, "-") && !testOperators[a] {
+				return false
+			}
+		}
+		return true
+	case name == "printf":
+		return false // -v and %n set a variable, and Bash works a subscript in its name out
+	case readOnly(name, args, false):
+		return true
+	case name == "command": // `command -v qk` looks a name up; `command <name>` runs it
+		return len(args) == 2 && (args[0] == "-v" || args[0] == "-V") && !protectedName.MatchString(args[1])
+	}
+	return bystanders[name] && !protectedName.MatchString(strings.Join(args, " "))
+}
+
+// plainTest judges the inside of `[[ ]]` as plainCall judges `test`.
+func plainTest(x syntax.TestExpr) bool {
+	switch x := x.(type) {
+	case *syntax.Word:
+		_, ok := plainWord(x)
+		return ok
+	case *syntax.ParenTest:
+		return plainTest(x.X)
+	case *syntax.UnaryTest:
+		return (x.Op.String() == "!" || testOperators[x.Op.String()]) && plainTest(x.X)
+	case *syntax.BinaryTest:
+		switch x.Op.String() {
+		case "==", "=", "!=", "&&", "||":
+			return plainTest(x.X) && plainTest(x.Y)
+		}
+	}
+	return false
+}
+
+// descriptor: the target of a redirect to another stream, as in `2>&1` and `>&-`.
+var descriptor = regexp.MustCompile(`^(\d+|-)$`)
+
+// plainRedirect reports whether the redirect is from a file written out in
+// full, to another stream, or to such a file that is not a protected path.
+func plainRedirect(r *syntax.Redirect) bool {
+	if r.N != nil && !descriptor.MatchString(r.N.Value) {
+		return false // {name}> stores a descriptor in a variable
+	}
+	target, ok := plainWord(r.Word)
+	if !ok {
+		return false
+	}
 	switch r.Op {
-	case syntax.RdrOut, syntax.AppOut, syntax.RdrInOut, syntax.DplOut, syntax.RdrClob, syntax.RdrAll, syntax.AppAll:
-	default:
-		return false // input, and here-documents
-	}
-	target, ok := literal(r.Word)
-	if r.Op == syntax.DplOut && ok && descriptor.MatchString(target) {
+	case syntax.RdrIn:
+		return true
+	case syntax.DplIn, syntax.DplOut:
+		if descriptor.MatchString(target) {
+			return true
+		}
+		if r.Op == syntax.DplIn {
+			return false
+		}
+	case syntax.RdrOut, syntax.AppOut, syntax.RdrClob, syntax.RdrAll, syntax.AppAll:
+	default: // here-documents and here-strings feed text to a command; `<>` opens for writing too
 		return false
 	}
 	// `>! file` is zsh's forced overwrite; read as Bash, the target is `!` and the file an argument.
-	return !ok || target == "!" || strings.ContainsAny(target, "*?[") || protectedName.MatchString(target)
+	return target != "!" && !strings.ContainsAny(target, "*?") && !protectedName.MatchString(target)
 }
 
-// names reports whether any word in the node names a protected path, also
-// when braces spell it, as in `quality.{yaml,bak}`.
+// plainWord returns the word as the shell will see it, when it is written
+// out in full: text and quotes only. One substitution is let through, the
+// form the skills use: `$(git merge-base <rev> <rev>)`, which prints a commit
+// id or nothing.
+//
+// Text outside quotes may hold only what no shell reads as more than text or
+// a file pattern: letters, digits and `_ . / : , @ % + = * ? ~ -`. Bash and
+// zsh differ on the rest (`=cmd`, `(…)` after a pattern, `^`, `#`, `!`).
+// Text inside quotes is taken as it is.
+func plainWord(w *syntax.Word) (string, bool) {
+	if w == nil {
+		return "", true
+	}
+	if isMergeBase(w) {
+		return "MERGE_BASE", true
+	}
+	switch lit := w.Lit(); lit {
+	case "[", "]": // the command `[` and its closing word
+		return lit, true
+	case `\(`, `\)`: // find's grouping
+		return lit[1:], true
+	}
+	var b strings.Builder
+	for i, p := range w.Parts {
+		switch p := p.(type) {
+		case *syntax.Lit:
+			if i == 0 && strings.HasPrefix(p.Value, "=") {
+				return "", false // zsh: `=name` is the path of the command `name`
+			}
+			for _, r := range p.Value {
+				if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("_./:,@%+=*?~-", r) {
+					return "", false
+				}
+			}
+			b.WriteString(p.Value)
+		case *syntax.SglQuoted:
+			if p.Dollar {
+				return "", false // $'...' has escapes of its own
+			}
+			b.WriteString(p.Value)
+		case *syntax.DblQuoted:
+			if p.Dollar {
+				return "", false
+			}
+			for _, q := range p.Parts {
+				lit, ok := q.(*syntax.Lit)
+				if !ok {
+					return "", false
+				}
+				b.WriteString(unescape(lit.Value, true))
+			}
+		default:
+			return "", false
+		}
+	}
+	return b.String(), true
+}
+
+// isMergeBase reports whether the word is `$(git merge-base <rev>...)`, bare
+// or in double quotes, with each revision a plain word that is no option.
+func isMergeBase(w *syntax.Word) bool {
+	parts := w.Parts
+	if len(parts) == 1 {
+		if q, ok := parts[0].(*syntax.DblQuoted); ok && !q.Dollar {
+			parts = q.Parts
+		}
+	}
+	if len(parts) != 1 {
+		return false
+	}
+	sub, ok := parts[0].(*syntax.CmdSubst)
+	if !ok || len(sub.Stmts) != 1 || len(sub.Stmts[0].Redirs) > 0 || sub.Stmts[0].Negated || sub.Stmts[0].Background {
+		return false
+	}
+	call, ok := sub.Stmts[0].Cmd.(*syntax.CallExpr)
+	if !ok || len(call.Assigns) > 0 || len(call.Args) < 3 {
+		return false
+	}
+	for i, arg := range call.Args {
+		word, ok := plainWord(arg)
+		switch {
+		case !ok || isMergeBase(arg):
+			return false
+		case i == 0 && word != "git", i == 1 && word != "merge-base", i > 1 && strings.HasPrefix(word, "-"):
+			return false
+		}
+	}
+	return true
+}
+
+// names reports whether a word in the tree names a protected path once
+// quotes, escapes and braces are worked out, as in `q""uality.yaml` and
+// `quality.{yaml,bak}`. It finds what the text of the line does not show; a
+// name built when the line runs is beyond it.
 func names(node syntax.Node) bool {
 	found := false
 	syntax.Walk(node, func(n syntax.Node) bool {
@@ -153,11 +299,11 @@ func names(node syntax.Node) bool {
 			braced.Parts[i] = p
 		}
 		if !syntax.SplitBraces(braced) {
-			found = found || protectedName.MatchString(text(w))
+			found = found || namesProtected(w)
 			return !found
 		}
 		for expanded, err := range expand.BracesSeq(nil, braced) {
-			if err != nil || protectedName.MatchString(text(expanded)) {
+			if err != nil || namesProtected(expanded) {
 				found = true // too many to work out counts as naming it
 				break
 			}
@@ -167,37 +313,10 @@ func names(node syntax.Node) bool {
 	return found
 }
 
-// hasVariable reports whether the command uses a variable, in its own words
-// or in a substitution inside them.
-func hasVariable(call *syntax.CallExpr) bool {
-	found := false
-	syntax.Walk(call, func(n syntax.Node) bool {
-		if _, ok := n.(*syntax.ParamExp); ok {
-			found = true
-		}
-		return !found
-	})
-	return found
-}
-
-// literal returns the word as Bash will see it, when that is known from the
-// text alone: plain text and quotes, with the quotes and escapes taken off.
-func literal(w *syntax.Word) (string, bool) {
-	s := text(w)
-	return s, !strings.Contains(s, unknown)
-}
-
-// unknown stands in text() for a part whose value is known only when the
-// line runs. It is no part of a file name, so `$DIR/quality.yaml` still names
-// the path.
-const unknown = "\x00"
-
-// text returns the word with quotes and escapes taken off, and unknown in
-// place of each expansion.
-func text(w *syntax.Word) string {
-	if w == nil {
-		return ""
-	}
+// namesProtected reports whether the word names a protected path, with each
+// part known only when the line runs taken as empty, and as a gap.
+func namesProtected(w *syntax.Word) bool {
+	const unknown = "\x00"
 	var b strings.Builder
 	var add func(parts []syntax.WordPart, quoted bool)
 	add = func(parts []syntax.WordPart, quoted bool) {
@@ -206,20 +325,19 @@ func text(w *syntax.Word) string {
 			case *syntax.Lit:
 				b.WriteString(unescape(p.Value, quoted))
 			case *syntax.SglQuoted:
-				if p.Dollar {
-					b.WriteString(unknown) // $'...' has escapes of its own
-				} else {
-					b.WriteString(p.Value)
-				}
+				b.WriteString(p.Value)
 			case *syntax.DblQuoted:
 				add(p.Parts, true)
+			case *syntax.ExtGlob:
+				b.WriteString(p.Pattern.Value)
 			default:
 				b.WriteString(unknown)
 			}
 		}
 	}
 	add(w.Parts, false)
-	return b.String()
+	s := b.String()
+	return protectedName.MatchString(s) || protectedName.MatchString(strings.ReplaceAll(s, unknown, ""))
 }
 
 // unescape takes the backslashes off as Bash does: before any character
