@@ -51,6 +51,9 @@ func (m Maturity) String() string {
 type Finding struct {
 	File    string `json:"file,omitempty"`
 	Message string `json:"message"`
+	// Package is the dependency a finding is about, as `name@version` or
+	// `name`, so a waiver can be for that package alone.
+	Package string `json:"package,omitempty"`
 }
 
 // Result is what a rule's Run returns.
@@ -208,7 +211,7 @@ func Run(rules []Rule, cfg Config, ctx Context) Report {
 // applyWaivers splits findings into those still open and those a valid waiver covers.
 func applyWaivers(rule string, findings []Finding, ctx Context) (open []Finding, waived []WaivedFinding) {
 	for _, f := range findings {
-		w := ctx.Waivers.Find(rule, f.File, ctx.Today)
+		w := ctx.Waivers.Find(rule, f.File, f.Package, ctx.Today)
 		if w == nil {
 			open = append(open, f)
 			continue

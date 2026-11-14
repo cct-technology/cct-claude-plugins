@@ -96,7 +96,7 @@ func (c *Client) Verify(p Package, now time.Time) Verdict {
 			what, info.Published.Format(time.DateOnly), days(age), int(MinAge.Hours()/24))})
 	}
 	if info.Deprecated != "" {
-		v.Problems = append(v.Problems, Problem{Deprecated, fmt.Sprintf("%s is deprecated: %s", what, info.Deprecated)})
+		v.Problems = append(v.Problems, Problem{Deprecated, fmt.Sprintf("%s is deprecated. The registry says: \"%s\"", what, info.Deprecated)})
 	}
 	switch {
 	case info.NoLicenceData:

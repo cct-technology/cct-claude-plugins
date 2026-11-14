@@ -39,11 +39,14 @@ const dateLayout = "2006-01-02"
 
 // Waiver is one agreed exception.
 type Waiver struct {
-	Rule    string   `yaml:"rule"`
-	Paths   []string `yaml:"paths,omitempty"` // globs; empty waives every finding of the rule
-	Reason  string   `yaml:"reason"`
-	Owner   string   `yaml:"owner"`
-	Expires string   `yaml:"expires"` // YYYY-MM-DD, valid through that day
+	Rule  string   `yaml:"rule"`
+	Paths []string `yaml:"paths,omitempty"` // globs; empty waives every finding of the rule
+	// Packages limits the waiver to findings about these packages: `name` for
+	// every version, `name@version` for one. Empty waives findings about any.
+	Packages []string `yaml:"packages,omitempty"`
+	Reason   string   `yaml:"reason"`
+	Owner    string   `yaml:"owner"`
+	Expires  string   `yaml:"expires"` // YYYY-MM-DD, valid through that day
 }
 
 // Loaded is the result of reading the waivers file.
@@ -70,6 +73,7 @@ type LogEntry struct {
 	ApprovedBy string   `json:"approved_by"`
 	Rule       string   `json:"rule"`
 	Paths      []string `json:"paths,omitempty"`
+	Packages   []string `json:"packages,omitempty"`
 	Reason     string   `json:"reason"`
 	Owner      string   `json:"owner,omitempty"`
 	Expires    string   `json:"expires,omitempty"`
@@ -96,7 +100,7 @@ func NewLogEntry(w Waiver, a Approval) LogEntry {
 	return LogEntry{
 		Time: a.Time.UTC().Format(time.RFC3339), Action: actionWaiverAdd,
 		Identity: a.Identity, ApprovedBy: a.By,
-		Rule: w.Rule, Paths: w.Paths, Reason: w.Reason, Owner: w.Owner, Expires: w.Expires,
+		Rule: w.Rule, Paths: w.Paths, Packages: w.Packages, Reason: w.Reason, Owner: w.Owner, Expires: w.Expires,
 	}
 }
 
@@ -188,14 +192,14 @@ func (l Loaded) approved(w Waiver) bool {
 	return slices.ContainsFunc(l.Log, func(e LogEntry) bool {
 		return e.Action == actionWaiverAdd && strings.TrimSpace(e.ApprovedBy) != "" &&
 			e.Rule == w.Rule && e.Reason == w.Reason && e.Owner == w.Owner && e.Expires == w.Expires &&
-			slices.Equal(e.Paths, w.Paths)
+			slices.Equal(e.Paths, w.Paths) && slices.Equal(e.Packages, w.Packages)
 	})
 }
 
-// Find returns the waiver covering a finding of rule on file, or nil.
-func (l Loaded) Find(rule, file string, today time.Time) *Waiver {
+// Find returns the waiver covering a finding of rule on file about pkg, or nil.
+func (l Loaded) Find(rule, file, pkg string, today time.Time) *Waiver {
 	for i, w := range l.Waivers {
-		if w.Rule == rule && len(l.ProblemsOf(w, today)) == 0 && w.covers(file) {
+		if w.Rule == rule && len(l.ProblemsOf(w, today)) == 0 && w.covers(file) && w.coversPackage(pkg) {
 			return &l.Waivers[i]
 		}
 	}
@@ -218,6 +222,21 @@ func (w Waiver) covers(file string) bool {
 }
 
 // ExpiringWithin returns the valid waivers that end within the given number of days.
+// coversPackage reports whether the waiver reaches a finding about pkg, which
+// is `name@version`, `name`, or "" for a finding about no package. A waiver
+// that names packages covers only those: by name for every version, or by
+// name and version for that one.
+func (w Waiver) coversPackage(pkg string) bool {
+	if len(w.Packages) == 0 {
+		return true
+	}
+	name := pkg
+	if at := strings.LastIndex(pkg, "@"); at > 0 { // not the @ that starts an npm scope
+		name = pkg[:at]
+	}
+	return pkg != "" && (slices.Contains(w.Packages, pkg) || slices.Contains(w.Packages, name))
+}
+
 func (l Loaded) ExpiringWithin(days int, today time.Time) []Waiver {
 	last := today.AddDate(0, 0, days).Format(dateLayout)
 	var out []Waiver

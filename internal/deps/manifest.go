@@ -251,11 +251,18 @@ func tableDeps(data []byte, ecosystem string, isDeps func(table string) bool) []
 }
 
 func cargoDeps(data []byte) []Package {
-	return tableDeps(data, "cargo", func(table string) bool {
+	pkgs := tableDeps(data, "cargo", func(table string) bool {
 		// dependencies, dev-dependencies, build-dependencies, alone or under target.<cfg> or workspace.
 		last := table[strings.LastIndex(table, ".")+1:]
 		return last == "dependencies" || last == "dev-dependencies" || last == "build-dependencies"
 	})
+	// Cargo reads a bare `1.2` as `^1.2`: a range, not that version.
+	for i, p := range pkgs {
+		if p.Version != "" && p.Version[0] >= '0' && p.Version[0] <= '9' {
+			pkgs[i].Version = "^" + p.Version
+		}
+	}
+	return pkgs
 }
 
 func pipfileDeps(data []byte) []Package {

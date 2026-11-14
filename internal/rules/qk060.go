@@ -24,7 +24,7 @@ func qk060() check.Rule {
 		EnforcedFrom: check.Silver,
 		Why: "A release that is a day old has been read by nobody. It may be a hijacked version of a package you have trusted for years, or a name an agent invented and an attacker registered. " +
 			"QK060 looks at every dependency a change adds or moves to another version, in `package.json`, `go.mod`, `composer.json`, `Cargo.toml`, `pyproject.toml`, `Pipfile` and `requirements*.txt`. " +
-			"The version is the one the lockfile holds (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `composer.lock`, `Cargo.lock`, `poetry.lock`, `uv.lock`, `Pipfile.lock`), so an upgrade that only changes the lockfile is found too. Without a lockfile, or for a name the lockfile does not hold, it is the version the manifest names, and the newest release when the registry has no version of exactly that number. Each finding names the version. " +
+			"The version is the one the lockfile holds (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `composer.lock`, `Cargo.lock`, `poetry.lock`, `uv.lock`, `Pipfile.lock`), so an upgrade that only changes the lockfile is found too. Without a lockfile, or for a name the lockfile does not hold, it is the version the manifest names when it names one exactly. For a range such as `^1.2.0` it is the newest release, because that is what an install without a lockfile may fetch. Each finding names the version. " +
 			"QK060 asks the public registry (npm, the Go module proxy, Packagist, crates.io, PyPI) four things. " +
 			"The package exists. That version was published at least 14 days ago. It is not deprecated, abandoned or yanked. Its licence is one of MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD and Unlicense; for a choice of licences one of them is enough. " +
 			"Only what a manifest names is checked, not the dependencies of dependencies. Indirect Go requirements, paths, git URLs, workspace members and folders named `node_modules` or `vendor` are left out. " +
@@ -33,7 +33,7 @@ func qk060() check.Rule {
 			"QK060 uses the network, so it runs only with `qk check --full` or when the `CI` environment variable is `true`; otherwise it is skipped and names what it did not check. " +
 			"Answers are kept for 24 hours. A registry that cannot be reached is never a finding: the check is skipped and says which package it could not ask about.",
 		Fix: "For a package that does not exist: check the name, it may be invented or misspelt. For a version that is too young: wait, or stay on an older version. For a deprecated one or a licence that is not allowed: pick another package. " +
-			"If a person decides the dependency is right all the same, such as an urgent security patch or a package of your own in a private registry, ask them to approve a waiver with `qk waiver add QK060 --path <the manifest>`.",
+			"If a person decides the dependency is right all the same, such as an urgent security patch or a package of your own in a private registry, ask them to approve a waiver for that package alone, with `qk waiver add QK060 --package <name>@<version>`.",
 		Run: runQK060,
 	}
 }
@@ -123,8 +123,13 @@ func runQK060(ctx check.Context) check.Result {
 			notAsked = append(notAsked, fmt.Sprintf("%s: %v", m.pkg, v.Err))
 			continue
 		}
+		// A waiver names the package: the name alone, or with the version that was looked at.
+		about := m.pkg.Name
+		if v.Info.Version != "" {
+			about += "@" + v.Info.Version
+		}
 		for _, p := range v.Problems {
-			findings = append(findings, check.Finding{File: m.file, Message: p.Message})
+			findings = append(findings, check.Finding{File: m.file, Message: p.Message, Package: about})
 		}
 	}
 	switch {

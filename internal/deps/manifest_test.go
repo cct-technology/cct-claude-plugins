@@ -51,18 +51,18 @@ func TestChangedReadsEveryManifest(t *testing.T) {
 			[]string{"composer monolog/monolog ^3.0", "composer phpunit/phpunit ^11"},
 		},
 		{
-			"cargo: every dependency table and both ways to write a dependency; paths, git and the workspace are left out",
+			"cargo: every dependency table and both ways to write a dependency, a bare version being a caret range; paths, git and the workspace are left out",
 			"Cargo.toml",
 			"[package]\nname = \"app\"\n\n[dependencies]\nserde = \"1\"\n",
 			"[package]\nname = \"app\"\n\n[dependencies]\nserde = \"1\"\ntokio = { version = \"1.38\", features = [\"full\"] }\nlocal = { path = \"../local\" }\nforked = { git = \"https://example.com/forked\" }\nshared = { workspace = true }\nrenamed = { package = \"real-name\", version = \"0.3\" }\n\n[dependencies.clap]\nversion = \"4.5\"\nfeatures = [\"derive\"]\n\n[dev-dependencies]\ntempfile = \"3\"\n\n[target.'cfg(unix)'.dependencies]\nlibc = \"0.2\"\n",
-			[]string{"cargo clap 4.5", "cargo libc 0.2", "cargo real-name 0.3", "cargo tempfile 3", "cargo tokio 1.38"},
+			[]string{"cargo clap ^4.5", "cargo libc ^0.2", "cargo real-name ^0.3", "cargo tempfile ^3", "cargo tokio ^1.38"},
 		},
 		{
 			"cargo: dotted keys, as workspace members write them",
 			"crates/api/Cargo.toml",
 			"[dependencies]\n",
 			"[dependencies]\nserde.workspace = true\nlocal.path = \"../local\"\nforked.git = \"https://example.com/forked\"\nregex.version = \"1.10\"\nregex.features = [\"std\"]\nanyhow = \"1\"\n",
-			[]string{"cargo anyhow 1", "cargo regex 1.10"},
+			[]string{"cargo anyhow ^1", "cargo regex ^1.10"},
 		},
 		{
 			"pypi: a dependency group that includes another group",
@@ -137,11 +137,15 @@ func TestChangedReadsEveryManifest(t *testing.T) {
 	}
 }
 
+// Only an exact version is looked up as written. A range resolves at install
+// time, so it is judged by the newest release.
 func TestNamedVersion(t *testing.T) {
 	for spec, want := range map[string]string{
-		"^1.2.3": "1.2.3", "~=0.30.0": "0.30.0", ">=2.0,<3": "2.0", "==3.0.3": "3.0.3", "1.38": "1.38",
+		"1.2.3": "1.2.3", "==3.0.3": "3.0.3", "=1.2.3": "1.2.3", "1.38": "1.38", " 18.3.1 ": "18.3.1",
 		"v1.8.0": "v1.8.0", "v0.0.0-20240102150405-abcdef123456": "v0.0.0-20240102150405-abcdef123456",
-		"*": "", "latest": "", "": "",
+		"^1.2.3": "", "~=0.30.0": "", ">=2.0,<3": "", "~1.2": "", "1.x": "", "1.2.*": "", ">=18": "",
+		"^8.0 || ^9.0": "", "1.0 - 2.0": "", "*": "", "": "",
+		"latest": "latest", "next": "next",
 	} {
 		if got := namedVersion(spec); got != want {
 			t.Errorf("namedVersion(%q) = %q, want %q", spec, got, want)

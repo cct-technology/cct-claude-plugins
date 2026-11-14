@@ -52,8 +52,8 @@ func Default() *Client {
 }
 
 // Lookup returns what the registry says about p: about the version p names
-// when the registry has exactly that version, otherwise about the newest
-// release. ErrNotFound means there is no such package; any other error means
+// when it names one exactly and the registry has it, otherwise about the
+// newest release (see namedVersion). ErrNotFound means there is no such package; any other error means
 // the registry could not be asked.
 func (c *Client) Lookup(p Package) (Info, error) {
 	want := namedVersion(p.Version)
@@ -79,23 +79,61 @@ func (c *Client) Lookup(p Package) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
+	// Whoever published the package wrote these. They go into findings Claude
+	// reads, so they are kept to one short line that cannot leave its quotes.
+	info.Version = clean(info.Version, 64)
+	info.Deprecated = clean(info.Deprecated, 160)
+	info.Licence = clean(info.Licence, 100)
 	c.store(p.Ecosystem, p.Name, want, info)
 	return info, nil
 }
 
-var versionInSpec = regexp.MustCompile(`[0-9][0-9A-Za-z.+_-]*`)
-
-// namedVersion is the first version a spec such as `^1.2.3`, `>=2.0,<3` or
-// `v1.4.0` names, or "" when it names none (`*`, `latest`).
-// ponytail: the version the manifest names, not the one the lockfile
-// resolved. `npm install x` writes `^<newest>`, so for a dependency that was
-// just added they agree; read the lockfiles when they do not.
-func namedVersion(spec string) string {
-	v := versionInSpec.FindString(spec)
-	if strings.HasPrefix(strings.TrimSpace(spec), "v") && v != "" {
-		return "v" + v // Go versions keep their v
+// clean keeps text from a registry to one line of at most max characters:
+// control characters and line ends become spaces, and quotes and backticks
+// become ', so the text stays inside the quotes a finding puts around it.
+func clean(text string, max int) string {
+	text = strings.Map(func(r rune) rune {
+		switch {
+		case unicode.IsControl(r):
+			return ' '
+		case r == '"' || r == '`':
+			return '\''
+		}
+		return r
+	}, text)
+	// An escape sequence leaves its tail behind: `ESC[2J` reads as `[2J`.
+	text = strings.Join(strings.Fields(ansiTail.ReplaceAllString(text, " ")), " ")
+	if runes := []rune(text); len(runes) > max {
+		return string(runes[:max]) + "…"
 	}
-	return v
+	return text
+}
+
+var (
+	ansiTail     = regexp.MustCompile(` \[[0-9;]*[A-Za-z]`)
+	exactVersion = regexp.MustCompile(`^v?[0-9][0-9A-Za-z.+_-]*$`)
+	tag          = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+)
+
+// namedVersion is the version to look up for what a manifest, a lockfile or a
+// person wrote: the version itself when it is exact (`1.2.3`, `==1.2.3`,
+// `v1.8.0`), an npm tag such as `next` as written, and "" for a range
+// (`^1.2.3`, `>=2,<3`, `1.x`, `*`).
+//
+// "" means the newest release. A range is settled when the package is
+// installed, to the newest version it allows, so that is the version an
+// install without a lockfile may fetch. Taking the lowest version a range
+// allows would pass a range whose newest match was published yesterday.
+func namedVersion(spec string) string {
+	spec = strings.TrimSpace(spec)
+	version := strings.TrimSpace(strings.TrimLeft(spec, "="))
+	switch {
+	case exactVersion.MatchString(version) && !strings.Contains(strings.ToLower(version), ".x"):
+		return version
+	case tag.MatchString(spec):
+		return spec
+	}
+	return ""
 }
 
 // get fetches a URL. A 404 or 410 is ErrNotFound; anything else that is not a
@@ -148,6 +186,9 @@ func (c *Client) npm(name, want string) (Info, error) {
 	// A scoped name keeps its @ and has its slash escaped.
 	if err := c.getJSON(c.NPM+"/"+strings.ReplaceAll(name, "/", "%2F"), &doc); err != nil {
 		return Info{}, err
+	}
+	if tagged, isTag := doc.DistTags[want]; isTag {
+		want = tagged
 	}
 	v, ok := doc.Versions[want]
 	if !ok {

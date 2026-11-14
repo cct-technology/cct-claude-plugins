@@ -110,7 +110,7 @@ feedback:
 | `qk check [--changed] [--base <ref>] [--format text|json|claude|sarif]` | Runs all checks. `--changed` limits to the diff against base (default: merge-base with default branch) |
 | `qk context` | Short summary for session start: mode, maturity, open findings, active waivers expiring soon |
 | `qk explain <rule-id>` | What the rule checks, why, and how to fix |
-| `qk waiver add <rule-id> --reason --expires --owner --approved-by` | Writes `.quality/waivers.yaml` and appends the approval to `.quality/exceptions-log.jsonl` |
+| `qk waiver add <rule-id> --reason --expires --owner --approved-by [--path] [--package]` | Writes `.quality/waivers.yaml` and appends the approval to `.quality/exceptions-log.jsonl` |
 | `qk deps verify <ecosystem> <name>[@version]` | Runs the QK060 checks for one package: exists, old enough, maintained, licence allowed. `<ecosystem>` is `npm`, `go`, `composer`, `cargo` or `pypi`. Exit 1 on a finding; a registry that cannot be reached is not one |
 | `qk docs-impact none --reason <reason> --approved-by <person>` | Writes `.quality/docs-impact/<branch>.md`, a "no docs needed" note that QK010 accepts before anything is committed, and appends the approval to `.quality/exceptions-log.jsonl` |
 | `qk version` | Version + manifest schema version |
@@ -261,5 +261,6 @@ None.
 - **Docs publishing** (2026-11-14, CCT-3423): the docs live in the repo only, as Markdown under `docs/`. No docs site.
 - **Dependency age** (2026-11-14, CCT-3421): a newly added dependency must be at least 14 days old, counted from the publish date of the version being added. An urgent patch needs a waiver.
 - **Upgrades** (2026-11-14, CCT-3436): QK060 also checks a dependency that moves to another version, including when only the lockfile changes. A hijacked release of a package already in use is the main case it is for.
+- **Waivers per package** (2026-11-14, CCT-3436): a QK060 waiver names the package, with or without a version (`--package express@4.19.3`), so one urgent patch does not let another dependency in the same manifest through.
 - **Licence allowlist** (2026-11-14, CCT-3421): permissive licences only: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense.
 - **Threat-model mitigations** (2026-11-14, CCT-3422): they go to Linear only after a person confirms which ones. The checklist in the threat model is the record.

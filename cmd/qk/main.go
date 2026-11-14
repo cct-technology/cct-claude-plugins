@@ -278,6 +278,7 @@ func newWaiverCmd(reg []check.Rule) *cobra.Command {
 	add.Flags().StringVar(&w.Owner, "owner", "", "who answers for this exception (required)")
 	add.Flags().StringVar(&w.Expires, "expires", "", "last day the waiver applies, YYYY-MM-DD (required)")
 	add.Flags().StringArrayVar(&w.Paths, "path", nil, "glob of files the waiver covers; repeatable (default: every finding of the rule)")
+	add.Flags().StringArrayVar(&w.Packages, "package", nil, "a dependency the waiver covers, as name or name@version; repeatable (default: findings about any package)")
 	add.Flags().StringVar(&approvedBy, "approved-by", "", "the person who approved this exception (required)")
 	for _, f := range []string{"reason", "owner", "expires", "approved-by"} {
 		_ = add.MarkFlagRequired(f)

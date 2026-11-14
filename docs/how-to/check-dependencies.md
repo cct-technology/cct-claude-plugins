@@ -30,7 +30,7 @@ So an upgrade is found both ways:
 
 A dependency is checked when it resolves to a version it did not resolve to before. A new range that still gives the same version is not a change.
 
-Without a lockfile, or for a name the lockfile does not hold yet, `qk` takes the version the manifest names, such as `1.3.0` from `^1.3.0`. If the registry has no version with exactly that number, it takes the newest release. Each finding names the version it looked at.
+Without a lockfile, or for a name the lockfile does not hold yet, `qk` takes the version the manifest names when it names one exactly, such as `1.3.0` or `==1.3.0`. For a range, such as `^1.3.0`, it takes the newest release: a range is settled when the package is installed, and that is the version an install may fetch. Each finding names the version it looked at.
 
 ## Run it
 
@@ -54,7 +54,7 @@ It does not run when Claude finishes. Nothing needs to be configured. From `silv
 ```text
 FAIL  QK060  New and upgraded dependencies exist, are old enough, maintained and licensed (enforced)
       - package.json: `reakt-domm` (npm) does not exist in the registry
-      - package.json: `left-pad` (npm) 1.3.0 is deprecated: use String.prototype.padStart()
+      - package.json: `left-pad` (npm) 1.3.0 is deprecated. The registry says: "use String.prototype.padStart()"
       - package.json: `left-pad` (npm) 1.3.0 has the licence `WTFPL`, which is not on the allowed list (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense)
 ```
 
@@ -84,7 +84,7 @@ qk deps verify go github.com/spf13/cobra@v1.8.0
 The first word is the registry: `npm`, `go`, `composer`, `cargo` or `pypi`. Without a version, the newest release is checked.
 
 ```text
-- `left-pad` (npm) 1.3.0 is deprecated: use String.prototype.padStart()
+- `left-pad` (npm) 1.3.0 is deprecated. The registry says: "use String.prototype.padStart()"
 - `left-pad` (npm) 1.3.0 has the licence `WTFPL`, which is not on the allowed list (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense)
 ```
 
@@ -92,18 +92,31 @@ Exit code `1` means a finding. `0` means the package is fine, or the registry co
 
 ## When the dependency is right all the same
 
-An urgent security patch may be a day old. A person can accept that with a [waiver](waive-a-finding.md), limited to the manifest and to a short time:
+An urgent security patch may be a day old. A person can accept that with a [waiver](waive-a-finding.md) for that package and that version:
 
 ```sh
 qk waiver add QK060 \
   --reason "express 4.19.3 is an urgent security fix; diff reviewed" \
   --owner rkvalvaa \
   --expires 2026-11-28 \
-  --path package.json \
+  --package express@4.19.3 \
   --approved-by rkvalvaa
 ```
 
-The waiver covers every QK060 finding in that manifest until it ends, so keep it short.
+The waiver covers `express` at 4.19.3 and nothing else. Another package in the same manifest is still checked, and so is `express` at 4.19.4.
+
+Leave the version out to cover every version of a package, as for a package of your own in a private registry:
+
+```sh
+qk waiver add QK060 \
+  --reason "Our own package, on our own registry" \
+  --owner rkvalvaa \
+  --expires 2027-06-30 \
+  --package @acme/tools \
+  --approved-by rkvalvaa
+```
+
+A waiver with `--path package.json` and no `--package` covers every QK060 finding in that manifest. Avoid it: it also lets through a package nobody looked at.
 
 ## When the registry cannot be reached
 
@@ -113,7 +126,7 @@ Answers are kept for 24 hours in your cache folder, so a second run asks nothing
 
 ## What it does not check
 
-- **Private packages.** Only the public registries are asked, so a package of your own in a private registry is reported as missing. Use a waiver for its manifest, or set `supply-chain.dependencies: advisory` under `modes`. The name of each dependency that is checked is sent to the public registry.
+- **Private packages.** Only the public registries are asked, so a package of your own in a private registry is reported as missing. Waive that package by name, as shown above. The name of each dependency that is checked is sent to the public registry.
 - **Dependencies of dependencies.** Only what your manifest names. A new version of a package that another package pulls in is not looked at.
 - **`bun.lock`.** A Bun project is judged by its `package.json`.
 - **Licences of Go modules.** The Go module proxy holds none. The other three questions are asked.

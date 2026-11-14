@@ -9,6 +9,7 @@ import (
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
 )
 
 var qk060Today = time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
@@ -244,5 +245,38 @@ func TestQK060SkipsWithoutAChangeSet(t *testing.T) {
 
 	if res := runRegisteredQK060(t, ctx); res.Status != check.Skipped || res.Reason == "" || *requests != 0 {
 		t.Errorf("result = %+v, want skipped with a reason", res)
+	}
+}
+
+// A waiver is for one package: the finding carries its name and version.
+func TestQK060AWaiverForOnePackageLeavesTheOthers(t *testing.T) {
+	fakeNPM(t, qk060Pages)
+	ctx := qk060Repo(t)
+	put(t, ctx.Root, "package.json", `{"dependencies": {"react": "^18.3.1", "fresh": "0.0.1", "reakt-domm": "1.0.0"}}`)
+	ctx = changed(t, ctx)
+
+	res := runRegisteredQK060(t, ctx)
+	var pkgs []string
+	for _, f := range res.Findings {
+		pkgs = append(pkgs, f.Package)
+	}
+	if strings.Join(pkgs, " ") != "fresh@0.0.1 reakt-domm" {
+		t.Fatalf("findings are about %q, want fresh@0.0.1 and reakt-domm", pkgs)
+	}
+
+	w := waivers.Waiver{Rule: "QK060", Packages: []string{"fresh@0.0.1"}, Reason: "urgent fix", Owner: "o", Expires: "2026-11-20"}
+	ctx.Waivers = waivers.Loaded{Present: true, Waivers: []waivers.Waiver{w},
+		Log: []waivers.LogEntry{waivers.NewLogEntry(w, waivers.Approval{By: "a person", Time: qk060Today})}}
+	var rule check.Rule
+	for _, r := range All() {
+		if r.ID == "QK060" {
+			rule = r
+		}
+	}
+	rep := check.Run([]check.Rule{rule}, check.Config{Maturity: check.Silver}, ctx)
+
+	got := rep.Results[0]
+	if len(got.Waived) != 1 || got.Waived[0].Message == "" || len(got.Findings) != 1 || got.Findings[0].Package != "reakt-domm" || !rep.Blocking {
+		t.Errorf("result = %+v, want fresh waived and reakt-domm still blocking", got)
 	}
 }

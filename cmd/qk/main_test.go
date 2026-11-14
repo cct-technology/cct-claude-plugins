@@ -1079,3 +1079,22 @@ func TestDepsVerifyUsageErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestWaiverAddForOnePackage(t *testing.T) {
+	dir := gitRepo(t)
+
+	code, _, errOut := runQK(t, rules.All(), "waiver", "add", "QK060",
+		"--reason", "urgent fix", "--owner", "rk", "--expires", "2099-12-31",
+		"--package", "express@4.19.3", "--package", "@acme/tools", "--approved-by", "a person")
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, errOut)
+	}
+	l := waivers.Load(dir)
+	if len(l.Problems) != 0 || len(l.Waivers) != 1 || strings.Join(l.Waivers[0].Packages, " ") != "express@4.19.3 @acme/tools" {
+		t.Fatalf("Load = %+v, want one waiver for the two packages", l)
+	}
+	if len(l.Log) != 1 || strings.Join(l.Log[0].Packages, " ") != "express@4.19.3 @acme/tools" {
+		t.Errorf("log = %+v, want the packages in the approval", l.Log)
+	}
+}
