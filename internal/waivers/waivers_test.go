@@ -188,7 +188,7 @@ func TestFind(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := l.Find(tt.rule, tt.file, today); (got != nil) != tt.want {
+			if got := l.Find(tt.rule, tt.file, "", today); (got != nil) != tt.want {
 				t.Errorf("Find = %+v, want found = %v", got, tt.want)
 			}
 		})

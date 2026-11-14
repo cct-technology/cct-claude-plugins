@@ -28,7 +28,7 @@ Each guide gets you to one goal. New here? Start with the [tutorial](../tutorial
 - QK010, QK020: [Keep docs in step with the code](keep-docs-in-step.md)
 - QK030: [Catch breaking API changes](catch-breaking-api-changes.md)
 - QK040: [Require a threat model for a new spec](require-a-threat-model-for-a-new-spec.md)
-- QK060: Coming (CCT-3436)
+- QK060: [Check new and upgraded dependencies](check-dependencies.md)
 - QK061: [Keep lockfiles in step with dependencies](keep-lockfiles-in-step.md)
 - QK110: [Give every path a code owner](give-every-path-a-code-owner.md)
 

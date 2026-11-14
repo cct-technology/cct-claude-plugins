@@ -17,6 +17,7 @@ This adds an entry to `.quality/waivers.yaml` at the repository root and an appr
 
 - `--expires` is the last day the waiver applies.
 - `--path` limits the waiver to matching files and can be repeated. Without it, the waiver covers every finding of that rule.
+- `--package` limits the waiver to findings about one dependency, and can be repeated: `--package express@4.19.3` for that version, `--package express` for every version. It is for [QK060](check-dependencies.md#when-the-dependency-is-right-all-the-same), whose findings are about packages.
 - In a path, `*` matches within one folder level, `**` matches any number of levels, and `?` matches one character. Everything else is literal, including `[id]` and `(admin)` in route folders.
 
 ## Who approves
@@ -35,9 +36,9 @@ The prompt is best effort: it reads the command text. Review at merge is the bac
 
 ## The log
 
-`.quality/exceptions-log.jsonl` has one line per approved exception: time, git identity, approver, rule, paths, reason, owner and end date. Git history shows every change to it.
+`.quality/exceptions-log.jsonl` has one line per approved exception: time, git identity, approver, rule, paths, packages, reason, owner and end date. Git history shows every change to it.
 
-A waiver counts only with a line matching all its fields. A waiver written by hand, or edited after approval (a later date, wider paths), does not apply, and QK100 reports it. The approver's name is what was typed; the prompt and the review are what make it an approval.
+A waiver counts only with a line matching all its fields. A waiver written by hand, or edited after approval (a later date, wider paths, another package), does not apply, and QK100 reports it. The approver's name is what was typed; the prompt and the review are what make it an approval.
 
 ## See what is waived
 

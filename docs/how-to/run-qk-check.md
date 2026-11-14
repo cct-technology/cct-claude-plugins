@@ -32,7 +32,7 @@ Checks that scan the whole repository then look only at the files changed agains
 qk check --full
 ```
 
-This also runs the slow checks: QK020 runs every command listed under `generated`. They run without `--full` when the `CI` environment variable is `true`, which most CI services set. Otherwise they are skipped with that reason. The hooks never run them.
+This also runs the slow checks: QK020 runs every command listed under `generated`, and QK060 asks the package registries about [new and upgraded dependencies](check-dependencies.md). They run without `--full` when the `CI` environment variable is `true`, which most CI services set. Otherwise they are skipped with that reason. The hooks never run them.
 
 > [!WARNING]
 > Do not edit files while `qk check --full` runs, and do not let Claude edit them.

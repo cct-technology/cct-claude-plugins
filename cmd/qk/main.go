@@ -22,6 +22,7 @@ import (
 
 	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/docsimpact"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/hook"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
@@ -32,6 +33,9 @@ import (
 
 // version is set at release time with -ldflags "-X main.version=<tag>".
 var version = "dev"
+
+// registry is what `qk deps verify` asks. Tests point it at a fake.
+var registry = deps.Default()
 
 // checkFormats are the --format values for qk check. SARIF needs the rule
 // registry and the qk version, so it is written by check.WriteSARIF.
@@ -144,7 +148,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	checkCmd.Flags().StringVar(&sarifFile, "sarif", "", "also write the report as SARIF to this file, whatever --format prints")
 	checkCmd.Flags().StringVar(&base, "base", "", "compare against the merge-base with this ref (default: the default branch, from origin/HEAD, main or master)")
 	checkCmd.Flags().BoolVar(&changedOnly, "changed", false, "limit checks that scan the whole repo to the files changed against the base")
-	checkCmd.Flags().BoolVar(&full, "full", false, "also run slow checks: QK020 runs every generator (on by default when CI=true)")
+	checkCmd.Flags().BoolVar(&full, "full", false, "also run slow checks: QK020 runs every generator, QK060 asks the package registries (on by default when CI=true)")
 	root.AddCommand(checkCmd)
 	root.AddCommand(&cobra.Command{
 		Use:   "context",
@@ -161,6 +165,7 @@ func newRootCmd(reg []check.Rule) *cobra.Command {
 	root.AddCommand(newInitCmd())
 	root.AddCommand(newWaiverCmd(reg))
 	root.AddCommand(newDocsImpactCmd())
+	root.AddCommand(newDepsCmd())
 	root.AddCommand(newHookCmd(reg))
 
 	root.AddCommand(&cobra.Command{
@@ -273,6 +278,7 @@ func newWaiverCmd(reg []check.Rule) *cobra.Command {
 	add.Flags().StringVar(&w.Owner, "owner", "", "who answers for this exception (required)")
 	add.Flags().StringVar(&w.Expires, "expires", "", "last day the waiver applies, YYYY-MM-DD (required)")
 	add.Flags().StringArrayVar(&w.Paths, "path", nil, "glob of files the waiver covers; repeatable (default: every finding of the rule)")
+	add.Flags().StringArrayVar(&w.Packages, "package", nil, "a dependency the waiver covers, as name or name@version; repeatable (default: findings about any package)")
 	add.Flags().StringVar(&approvedBy, "approved-by", "", "the person who approved this exception (required)")
 	for _, f := range []string{"reason", "owner", "expires", "approved-by"} {
 		_ = add.MarkFlagRequired(f)
@@ -414,4 +420,62 @@ func newDocsImpactCmd() *cobra.Command {
 	impact := &cobra.Command{Use: "docs-impact", Short: "Say what a change means for the docs"}
 	impact.AddCommand(none)
 	return impact
+}
+
+func newDepsCmd() *cobra.Command {
+	verify := &cobra.Command{
+		Use:   "verify <ecosystem> <name>[@version]",
+		Short: "Check one package before it is added or upgraded: it exists, is old enough, maintained and licensed",
+		Long: "Asks the public registry about one package, as QK060 does for every dependency a change adds or upgrades. " +
+			"The ecosystem is one of " + strings.Join(deps.Ecosystems, ", ") + ". Without a version, the newest release is checked.\n\n" +
+			"Exit code 1 means a finding. A registry that cannot be reached is not a finding: the command says so and exits 0.",
+		Example: "  qk deps verify npm left-pad\n  qk deps verify npm @types/node@22.1.0\n  qk deps verify go github.com/spf13/cobra@v1.8.0",
+		Args:    cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pkg := deps.Package{Ecosystem: args[0], Name: args[1]}
+			if !slices.Contains(deps.Ecosystems, pkg.Ecosystem) {
+				return fmt.Errorf("unknown ecosystem %q (want one of %s)", pkg.Ecosystem, strings.Join(deps.Ecosystems, ", "))
+			}
+			// The last @, and not the first character: an npm scope starts with one.
+			if at := strings.LastIndex(pkg.Name, "@"); at > 0 {
+				pkg.Name, pkg.Version = pkg.Name[:at], pkg.Name[at+1:]
+			}
+			if pkg.Name == "" || strings.HasPrefix(pkg.Name, "@") && !strings.Contains(pkg.Name, "/") {
+				return fmt.Errorf("no package name in %q", args[1])
+			}
+			return writeVerdict(cmd.OutOrStdout(), registry.Verify(pkg, time.Now()))
+		},
+	}
+	d := &cobra.Command{Use: "deps", Short: "Check dependencies against their registry"}
+	d.AddCommand(verify)
+	return d
+}
+
+// writeVerdict prints what was found about one package. It returns
+// errBlocking for a finding, and nil when the registry could not be asked.
+func writeVerdict(w io.Writer, v deps.Verdict) error {
+	if v.Err != nil {
+		_, err := fmt.Fprintf(w, "skipped: could not ask the registry about %s: %v\n", v.Package, v.Err)
+		return err
+	}
+	if len(v.Problems) == 0 {
+		facts := fmt.Sprintf("ok: %s %s", v.Package, v.Info.Version)
+		if !v.Info.Published.IsZero() {
+			facts += ", published " + v.Info.Published.Format(time.DateOnly)
+		}
+		if v.Info.Licence != "" {
+			facts += ", licence " + v.Info.Licence
+		}
+		fmt.Fprintln(w, facts)
+	}
+	for _, p := range v.Problems {
+		fmt.Fprintln(w, "- "+p.Message)
+	}
+	for _, n := range v.Notes {
+		fmt.Fprintln(w, n)
+	}
+	if len(v.Problems) > 0 {
+		return errBlocking
+	}
+	return nil
 }

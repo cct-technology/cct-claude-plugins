@@ -82,7 +82,7 @@ wrote .github/CODEOWNERS
 wrote .github/workflows/quality-kit.yml
 ```
 
-`quality.yaml` is the manifest: it says what this repository owes. `silver` means the checks on docs, contracts, generated files, lockfiles and waivers block.
+`quality.yaml` is the manifest: it says what this repository owes. `silver` means the checks on docs, contracts, generated files, dependencies, lockfiles and waivers block.
 
 If Claude wants to change `quality.yaml` afterwards, Claude Code asks you first. That file decides which checks block, so a person approves every change to it.
 
@@ -100,6 +100,7 @@ PASS  QK010  Docs change with the code they describe (enforced)
 PASS  QK020  Generated files equal their generator's output (enforced)
 PASS  QK030  No breaking OpenAPI changes (enforced)
 PASS  QK040  A new spec has a threat model (advisory)
+PASS  QK060  New and upgraded dependencies exist, are old enough, maintained and licensed (enforced)
 PASS  QK061  Dependencies have a lockfile that changes with them (enforced)
 PASS  QK100  Waivers are valid, owned and not expired (enforced)
 WARN  QK110  Every top-level path has a code owner (advisory)
@@ -111,7 +112,7 @@ WARN  QK110  Every top-level path has a code owner (advisory)
       - internal: no owner: no line in `.github/CODEOWNERS` covers this folder
       fix: Add a line for the path to `CODEOWNERS`, such as `/docs/ @your-team`, or give everything a default owner with `* @your-team` on the first line. ...
 
-0 fail, 1 warn, 7 pass, 0 skipped
+0 fail, 1 warn, 8 pass, 0 skipped
 ```
 
 Each line is one check. `(enforced)` means a failure blocks; `(advisory)` means it only warns. QK110 warns: most of the repository has no owner. At silver that does not block, but fix it anyway.
@@ -135,7 +136,7 @@ qk check
 ```
 
 ```text
-0 fail, 0 warn, 8 pass, 0 skipped
+0 fail, 0 warn, 9 pass, 0 skipped
 ```
 
 That is the whole loop: `qk` names what is missing and how to fix it, and you or Claude fix it.
@@ -190,7 +191,7 @@ qk check
 ```
 
 ```text
-0 fail, 0 warn, 8 pass, 0 skipped
+0 fail, 0 warn, 9 pass, 0 skipped
 ```
 
 You asked for a code change only, and the doc was updated all the same. That is what Quality Kit is for.
