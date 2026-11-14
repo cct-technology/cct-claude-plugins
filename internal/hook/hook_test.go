@@ -264,6 +264,8 @@ func TestPreToolUseStaysOutOfTheWay(t *testing.T) {
 		{"a diff of it against the merge base", shell("Bash", `git diff "$(git merge-base main HEAD)" -- quality.yaml`)},
 		{"a read beside a find with grouped tests", shell("Bash", `cat quality.yaml; find . \( -iname 'openapi*' -o -iname 'swagger*' \) -not -path './vendor/*'`)},
 		// Lines the skills ran in the evals.
+		{"a look at the tags and the manifest", shell("Bash", `git describe --tags --abbrev=0; git tag; git log --oneline | head -20; ls -a; cat quality.yaml 2>/dev/null`)},
+		{"the branch and the manifest", shell("Bash", `git branch --show-current; cat quality.yaml`)},
 		{"a look around a repository", shell("Bash", `git ls-files; cat quality.yaml; cat README* 2>/dev/null | head -30; grep -rn "go:generate" --include=*.go . | head; ls Makefile 2>/dev/null; find . \( -iname 'openapi*' -o -iname 'swagger*' \) -not -path './node_modules/*' -not -path './vendor/*'; ls docs`)},
 		{"a look around, then qk check", shell("Bash", `cat quality.yaml CODEOWNERS package.json; find src docs -type f; find . -path ./.git -prune -o \( -iname 'openapi*' -o -iname 'swagger*' \) -print 2>/dev/null | grep -v bashrc; qk check 2>&1 | grep -v bashrc`)},
 		{"a check, a diff and a read", shell("Bash", `qk check --full --format claude; git diff "$(git merge-base main HEAD)" -- src/price.js; ls docs; cat quality.yaml`)},
@@ -287,6 +289,33 @@ func TestPreToolUseStaysOutOfTheWay(t *testing.T) {
 			}
 			if out != nil {
 				t.Errorf("decision = %+v, want none", out.HookSpecificOutput)
+			}
+		})
+	}
+}
+
+// A read that shares a line with a command the hook does not know asks. Claude
+// gets the reason when nobody approves, and must learn from it that the read
+// itself is fine, or it gives the task up.
+func TestPreToolUseSaysHowToReadWhenALineIsNotAPlainRead(t *testing.T) {
+	const advice = "command of its own"
+	tests := []struct {
+		name, input string
+		want        bool
+	}{
+		{"a read beside a command the hook does not know", shell("Bash", `make docs; cat quality.yaml`), true},
+		{"the same in PowerShell", shell("PowerShell", `npm test; Get-Content quality.yaml`), true},
+		{"a command that records an exception", shell("Bash", `qk waiver add QK010 --reason r`), false},
+		{"an edit", file("Edit", `/repo/.quality/waivers.yaml`), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := PreToolUse([]byte(tt.input))
+			if err != nil || out == nil {
+				t.Fatalf("out = %v, err = %v, want ask", out, err)
+			}
+			if got := strings.Contains(out.HookSpecificOutput.PermissionDecisionReason, advice); got != tt.want {
+				t.Errorf("reason = %q, has the advice = %v, want %v", out.HookSpecificOutput.PermissionDecisionReason, got, tt.want)
 			}
 		})
 	}

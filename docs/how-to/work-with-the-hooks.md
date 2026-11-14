@@ -19,11 +19,13 @@ The prompt means Claude is about to record an exception, or to change `.quality/
 | Runs a shell command that names one of them, unless it is a plain read | Yes |
 | Runs a plain read of one of them | No |
 
+The prompt for a shell command that is not a plain read says so, and tells Claude that a read on its own line needs no approval. So when a read shared a line with other work and nobody approves, Claude runs the read again by itself and goes on.
+
 ### What a plain read is
 
 A shell line that names `.quality/` or `quality.yaml` is a plain read when all of this holds. The hook lists what is allowed; anything else on such a line is asked about.
 
-- **Every command on the line only reads.** These do: `cat`, `head`, `tail`, `grep`, `rg`, `ls`, `find`, `wc`, `diff`, `jq`, `test`, `echo`, and in PowerShell `Get-Content`, `Select-String`, `Test-Path`, `Get-Item` and `Get-ChildItem`. So do `git diff`, `log`, `show`, `status` and `blame`. `git add` and `git commit` record a file without changing it, so they count too.
+- **Every command on the line only reads.** These do: `cat`, `head`, `tail`, `grep`, `rg`, `ls`, `find`, `wc`, `diff`, `jq`, `test`, `echo`, and in PowerShell `Get-Content`, `Select-String`, `Test-Path`, `Get-Item` and `Get-ChildItem`. So do `git diff`, `log`, `show`, `status` and `blame`. `git add` and `git commit` record a file without changing it, and `git tag` and `git branch` name commits, so they count too.
 - **A few other commands may stand beside a read**, when they do not name the path themselves: `qk`, `cd`, `which`, `type` and `command -v`.
 - **Every word is written out in full.** No variables and no `$( )`, with one exception: `$(git merge-base <rev> <rev>)`. Outside quotes a word may hold letters, digits and `_ . / : , @ % + = * ? ~ -`, and `find` may be given `\(` and `\)`. Inside quotes anything goes.
 - **The commands are joined plainly**: `;`, `&&`, `||`, `|`, `if`, `( )` and `{ }`. No assignments, loops, functions or here-documents.
