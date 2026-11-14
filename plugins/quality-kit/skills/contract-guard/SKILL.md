@@ -7,8 +7,6 @@ description: Keep API, event and dataset contracts true to the code. Use when a 
 
 The contract is what clients build against. It says what the code does now, and `qk` says whether that breaks them. A break is the person's choice, made knowingly: your part is to make it visible.
 
-`quality.yaml` is guarded: read it with Read, and run each `qk` command on its own.
-
 ## 1. Find the contract
 
 Read `contracts` in `quality.yaml`: `openapi`, `asyncapi` and `odcs` are lists of globs. Then search the repository for contract files it does not list.

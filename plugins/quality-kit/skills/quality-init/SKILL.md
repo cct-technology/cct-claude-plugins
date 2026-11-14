@@ -7,11 +7,9 @@ description: Set up Quality Kit in a repository. Asks for data class, maturity a
 
 `qk` writes the files and decides every pass and fail. You ask, run it, and add what only this repository can say. Every fact you report is a line `qk` printed or a file you read.
 
-`quality.yaml` is guarded: a shell command that names it stops for a person's approval, even one that only reads it. Find it with Glob, read it with Read, change it with Edit, and run each `qk` command on its own.
-
 ## 1. Is it set up already?
 
-Look for `quality.yaml` at the repository root with Glob.
+Look for `quality.yaml` at the repository root.
 
 - **It exists:** the repository is set up. Run `qk check`, show the findings as `qk` printed them, and finish there. `quality.yaml` stays as it is: changing it is a person's decision.
 - **It does not:** go on.

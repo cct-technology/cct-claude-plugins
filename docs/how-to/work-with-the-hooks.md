@@ -5,8 +5,26 @@ With the plugin enabled, three hooks run `qk` through `bin/qk` in every session.
 | When | What happens |
 | --- | --- |
 | A session starts, resumes, or is cleared or compacted | `qk context` is added to Claude's context: maturity, which checks are enforced, open findings, and waivers ending soon. |
-| Claude runs a shell command or edits a file | If it records an exception (`qk waiver add`, `qk docs-impact`) or touches `.quality/` or `quality.yaml`, Claude Code asks a person first. |
+| Claude runs a shell command or edits a file | If it records an exception (`qk waiver add`, `qk docs-impact`) or could change `.quality/` or `quality.yaml`, Claude Code asks a person first. Reading them asks nobody. |
 | Claude tries to finish | `qk check --changed` runs. Enforced failures send Claude back with the findings. Advisory findings are shown to you, and Claude stops. |
+
+## When you are asked to approve
+
+The prompt means Claude is about to record an exception, or to change `.quality/` or `quality.yaml`, where a check can be turned off. Read what it wants to change before you approve.
+
+| Claude does this | Asked? |
+| --- | --- |
+| Runs `qk waiver add` or `qk docs-impact` | Yes |
+| Edits or writes a file under `.quality/`, or `quality.yaml` | Yes |
+| Runs a shell command that can change one of them: a redirect into it, `sed -i`, `rm`, `mv`, `cp`, `tee`, `git checkout`, `Set-Content` | Yes |
+| Runs a shell command the hook does not know, with one of them named in it: a script, `python -c`, `sh -c`, `xargs` | Yes |
+| Runs a command that can write or start a program through an option or its script, with one of them named in it: `sed`, `awk`, `sort`, `yq`, `less`, `git -c ...`, a variable set in front as in `PAGER=x git log` | Yes |
+| Reads one of them with a command that can only read: `cat`, `head`, `grep`, `ls`, `test -f`, `diff`, `git diff`, `git log`, `Get-Content` | No |
+| Records one in git: `git add`, `git commit` | No |
+
+A line with several commands is asked about when any command in it could change a protected path. So `test -f quality.yaml && qk init` is not asked about, and `cat quality.yaml; rm quality.yaml` is.
+
+The hook reads the text of the command; it does not run a shell. When it cannot tell a read from a write, it asks. It can still miss a write, for example when a file name sits in a variable from an earlier command. Review of `.quality/` and `quality.yaml` at merge is the backstop: see [who approves](waive-a-finding.md#who-approves).
 
 ## When Claude is sent back
 
