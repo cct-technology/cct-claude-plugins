@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: test-plan-roles-and-tenants
+context:
+  scaffold_script: scaffold.sh
