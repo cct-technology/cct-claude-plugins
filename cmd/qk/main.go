@@ -299,7 +299,7 @@ func newHookCmd(reg []check.Rule) *cobra.Command {
 		},
 	}
 	h.AddCommand(hookCmd("pre-tool-use", "Decide a PreToolUse hook from its JSON on stdin", func(input []byte) (any, error) {
-		out, err := hook.PreToolUse(input)
+		out, err := hook.PreToolUse(input, guards(reg))
 		if out == nil {
 			return nil, err
 		}
@@ -342,6 +342,52 @@ func newHookCmd(reg []check.Rule) *cobra.Command {
 		return out, err
 	}))
 	return h
+}
+
+// lookupBudget is how long the PreToolUse hook may spend asking registries
+// about one command. After it, the packages left are not checked: a hook must
+// not hold the session, and QK060 checks them in CI.
+const lookupBudget = 30 * time.Second
+
+// guards tells the PreToolUse hook what the repository's generated files are
+// and how to ask about a package. Each guard takes its mode from its check:
+// QK020 for generated files, QK060 for installs.
+func guards(reg []check.Rule) hook.Guards {
+	root, err := repoRoot()
+	if err != nil {
+		return hook.Guards{}
+	}
+	loaded := manifest.Load(root)
+	cfg := check.ConfigFrom(loaded)
+	mode := func(id string) string {
+		for _, r := range reg {
+			if r.ID == id {
+				return string(cfg.ModeFor(r))
+			}
+		}
+		return ""
+	}
+	deadline := time.Now().Add(lookupBudget)
+	return hook.Guards{
+		GeneratedMode: mode("QK020"),
+		DepsMode:      mode("QK060"),
+		Generator:     func(path string) (string, bool) { return loaded.Manifest.Generator(root, path) },
+		Verify: func(p deps.Package) deps.Verdict {
+			if time.Now().After(deadline) {
+				return deps.Verdict{Package: p, Err: errors.New("out of time")}
+			}
+			first := registry.Verify(p, time.Now())
+			// `go get` names a package, which may be a folder of its module.
+			// The proxy knows modules, so ask about each shorter path too.
+			for v := first; p.Ecosystem == "go" && len(v.Problems) == 1 && v.Problems[0].Kind == deps.Missing && strings.Count(p.Name, "/") > 1; {
+				p.Name = p.Name[:strings.LastIndex(p.Name, "/")]
+				if v = registry.Verify(p, time.Now()); v.Err != nil || len(v.Problems) != 1 || v.Problems[0].Kind != deps.Missing {
+					return v
+				}
+			}
+			return first
+		},
+	}
 }
 
 // hookCmd reads a hook's JSON on stdin and writes decide's answer as JSON. A

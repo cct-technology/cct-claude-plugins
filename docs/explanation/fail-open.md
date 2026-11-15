@@ -13,6 +13,7 @@ The reason is trust. A tool that stops your work because its own download failed
 | What goes wrong | What happens |
 | --- | --- |
 | `qk` cannot be found or downloaded | The hook warns and exits 0. When a session starts, you also see one message saying `qk` did not run. |
+| The hook that reads Claude's edits and installs fails, or runs out of time | The edit or the install goes through unchecked. QK020 and QK060 check the same things in CI. |
 | A hook fails in any other way | The same: a warning, exit 0. A `qk hook` command never exits with an error, because Claude Code reads one as a block. |
 | A check crashes | That check is `skipped` with `rule crashed: ...`. The other checks run. |
 | A tool a check needs is not installed, such as `oasdiff` | The check is `skipped` and says how to install the tool. |

@@ -81,17 +81,17 @@ func (c *Client) Lookup(p Package) (Info, error) {
 	}
 	// Whoever published the package wrote these. They go into findings Claude
 	// reads, so they are kept to one short line that cannot leave its quotes.
-	info.Version = clean(info.Version, 64)
-	info.Deprecated = clean(info.Deprecated, 160)
-	info.Licence = clean(info.Licence, 100)
+	info.Version = Clean(info.Version, 64)
+	info.Deprecated = Clean(info.Deprecated, 160)
+	info.Licence = Clean(info.Licence, 100)
 	c.store(p.Ecosystem, p.Name, want, info)
 	return info, nil
 }
 
-// clean keeps text from a registry to one line of at most max characters:
+// Clean keeps text that someone else wrote to one line of at most max characters:
 // control characters and line ends become spaces, and quotes and backticks
 // become ', so the text stays inside the quotes a finding puts around it.
-func clean(text string, max int) string {
+func Clean(text string, max int) string {
 	text = strings.Map(func(r rune) rune {
 		switch {
 		case unicode.IsControl(r):

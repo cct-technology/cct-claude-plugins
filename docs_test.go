@@ -3,11 +3,14 @@ package qualitykit_test
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
 	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
 )
 
@@ -94,5 +97,32 @@ func TestDocsHoldTogether(t *testing.T) {
 		if name := filepath.Base(filepath.Dir(file)); !strings.Contains(readme, "| `"+name+"` |") {
 			t.Errorf("README.md: no row for the skill %s", name)
 		}
+	}
+}
+
+// The PreToolUse hook refuses an edit to a generated file. A file that only
+// talks about the header, such as the code that writes it or a how-to that
+// quotes it, must stay editable: in this repository only the two reference
+// pages and their golden copies are generated.
+func TestOnlyTheReferencePagesCountAsGenerated(t *testing.T) {
+	out, err := exec.Command("git", "ls-files").Output()
+	if err != nil {
+		t.Skip("not a git checkout:", err)
+	}
+	m := manifest.Load(".").Manifest
+	var generated []string
+	for _, file := range strings.Fields(string(out)) {
+		if _, ok := m.Generator(".", file); ok {
+			generated = append(generated, file)
+		}
+	}
+	// The golden files are copies of generated pages, header and all, so they count too.
+	want := []string{
+		"docs/reference/manifest.md", "docs/reference/rules.md",
+		"internal/check/testdata/reference-empty.golden", "internal/check/testdata/reference.golden",
+		"internal/manifest/testdata/reference/reference.golden",
+	}
+	if !slices.Equal(generated, want) {
+		t.Errorf("generated files = %v, want %v", generated, want)
 	}
 }

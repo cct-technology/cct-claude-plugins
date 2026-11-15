@@ -47,7 +47,7 @@ SKIP  QK060  New and upgraded dependencies exist, are old enough, maintained and
       skipped: slow: asks the package registries about `left-pad` (npm) 1.3.0, `is-odd` (npm) 3.0.1; runs with `qk check --full` or in CI
 ```
 
-It does not run when Claude finishes. Nothing needs to be configured. From `silver` up, QK060 blocks. At `bronze` it warns.
+It does not run when Claude finishes. In a session, a hook covers the moment that matters most: when Claude installs a package, the install is [blocked](work-with-the-hooks.md#when-an-install-is-blocked) if the package does not exist or is too new. Nothing needs to be configured. From `silver` up, QK060 blocks. At `bronze` it warns.
 
 ## Read a finding
 
