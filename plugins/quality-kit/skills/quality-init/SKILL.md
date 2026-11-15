@@ -50,4 +50,4 @@ Run `qk check`. Then report, in this order:
 2. What you added to `quality.yaml`, and the file or folder each entry rests on.
 3. The summary line of `qk check` and each finding, as printed.
 4. The last paragraph of the `qk init` output, word for word: the setting that makes the host require review.
-5. **Left for you:** what only a person can supply. Owners for CODEOWNERS, the keys you left out, and the `QK_RELEASE_TOKEN` secret when a CI workflow was written.
+5. **Left for you:** what only a person can supply. Owners for CODEOWNERS, and the keys you left out.

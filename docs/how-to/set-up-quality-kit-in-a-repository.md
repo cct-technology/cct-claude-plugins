@@ -63,5 +63,4 @@ A second run writes only what is still missing. On a repository that is already 
 1. In `quality.yaml`, add `owners`, and a `docs.impact_map` that says [which docs change with which code](keep-docs-in-step.md).
 2. In `.github/CODEOWNERS`, replace `@your-team`, and [give the other top-level paths an owner](give-every-path-a-code-owner.md).
 3. Turn on the setting `qk init` printed. For GitHub, the steps are under [Require a person's review of exceptions](run-quality-kit-in-github-actions.md#require-a-persons-review-of-exceptions).
-4. While the Quality Kit repository is private, add the `QK_RELEASE_TOKEN` secret, as [Run Quality Kit in GitHub Actions](run-quality-kit-in-github-actions.md#while-the-quality-kit-repository-is-private) describes.
-5. Run [`qk check`](run-qk-check.md).
+4. Run [`qk check`](run-qk-check.md).

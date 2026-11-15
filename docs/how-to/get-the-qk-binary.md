@@ -1,9 +1,9 @@
 # Get the qk binary
 
-Quality Kit's hooks need the `qk` binary. The plugin ships a small script, `bin/qk`, that finds the right one. Once releases are public you do nothing: the first hook that needs `qk` downloads it.
+Quality Kit's hooks need the `qk` binary. The plugin ships a small script, `bin/qk`, that finds the right one. Once the first release is out you do nothing: the first hook that needs `qk` downloads it.
 
 > [!NOTE]
-> Today you install `qk` yourself. The download needs a release that anyone can read, and there is none yet: `v0.1.0` is not tagged, and `cct-technology/cct-claude-plugins` is private, so `bin/qk` cannot sign in to it. See [Install qk yourself](#install-qk-yourself).
+> Today you install `qk` yourself. The download needs a release, and there is none yet: `v0.1.0` is not tagged. See [Install qk yourself](#install-qk-yourself).
 
 ## How the plugin finds qk
 
@@ -17,7 +17,7 @@ If all three fail, it prints a warning on stderr and exits 0. The check does not
 
 ## Install qk yourself
 
-Do this before the first release, while the repository is private, or on a machine with no access to GitHub. `<version>` is the `version` in the plugin's `plugin.json`.
+Do this before the first release, or on a machine with no access to GitHub. `<version>` is the `version` in the plugin's `plugin.json`.
 
 On Windows, run the commands in Git Bash, and write `qk.exe` wherever a command names the file `qk`. The plugin looks for that name, and does not find a file named `qk`.
 
@@ -29,13 +29,7 @@ cd cct-claude-plugins
 go build -ldflags "-X main.version=<version>" -o qk ./cmd/qk
 ```
 
-**From a release, while the repository is private**, download with `gh`, which signs in for you:
-
-```sh
-gh release download v<version> -R cct-technology/cct-claude-plugins -p "qk_<version>_linux_amd64.tar.gz" -p checksums.txt
-```
-
-**From a public release**, download the archive for your system and `checksums.txt` from the [releases page](https://github.com/cct-technology/cct-claude-plugins/releases).
+**From a release**, download the archive for your system and `checksums.txt` from the [releases page](https://github.com/cct-technology/cct-claude-plugins/releases).
 
 Verify a downloaded archive against `checksums.txt` and unpack it:
 
