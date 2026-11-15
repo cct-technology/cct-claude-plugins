@@ -3,7 +3,7 @@
 Quality Kit's hooks need the `qk` binary. The plugin ships a small script, `bin/qk`, that finds the right one. Once releases are public you do nothing: the first hook that needs `qk` downloads it.
 
 > [!NOTE]
-> Today you install `qk` yourself. The download needs a release that anyone can read, and there is none yet: `v0.1.0` is not tagged, and `rkvalvaa/cct-claude-plugins` is private, so `bin/qk` cannot sign in to it. See [Install qk yourself](#install-qk-yourself).
+> Today you install `qk` yourself. The download needs a release that anyone can read, and there is none yet: `v0.1.0` is not tagged, and `cct-technology/cct-claude-plugins` is private, so `bin/qk` cannot sign in to it. See [Install qk yourself](#install-qk-yourself).
 
 ## How the plugin finds qk
 
@@ -24,7 +24,7 @@ On Windows, run the commands in Git Bash, and write `qk.exe` wherever a command 
 **Before the first release**, build `qk` from a clone. This needs Go:
 
 ```sh
-git clone https://github.com/rkvalvaa/cct-claude-plugins
+git clone https://github.com/cct-technology/cct-claude-plugins
 cd cct-claude-plugins
 go build -ldflags "-X main.version=<version>" -o qk ./cmd/qk
 ```
@@ -32,10 +32,10 @@ go build -ldflags "-X main.version=<version>" -o qk ./cmd/qk
 **From a release, while the repository is private**, download with `gh`, which signs in for you:
 
 ```sh
-gh release download v<version> -R rkvalvaa/cct-claude-plugins -p "qk_<version>_linux_amd64.tar.gz" -p checksums.txt
+gh release download v<version> -R cct-technology/cct-claude-plugins -p "qk_<version>_linux_amd64.tar.gz" -p checksums.txt
 ```
 
-**From a public release**, download the archive for your system and `checksums.txt` from the [releases page](https://github.com/rkvalvaa/cct-claude-plugins/releases).
+**From a public release**, download the archive for your system and `checksums.txt` from the [releases page](https://github.com/cct-technology/cct-claude-plugins/releases).
 
 Verify a downloaded archive against `checksums.txt` and unpack it:
 

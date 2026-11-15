@@ -135,7 +135,7 @@ func WriteSARIF(w io.Writer, rep Report, rules []Rule, version string) error {
 		Results     []sarifResult `json:"results"`
 	}
 	r := run{Invocations: []invocation{{true, notes}}, Results: results}
-	r.Tool.Driver = driver{"Quality Kit", version, "https://github.com/rkvalvaa/cct-claude-plugins", sRules}
+	r.Tool.Driver = driver{"Quality Kit", version, "https://github.com/cct-technology/cct-claude-plugins", sRules}
 	log := struct {
 		Schema  string `json:"$schema"`
 		Version string `json:"version"`

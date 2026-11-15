@@ -2,7 +2,7 @@
 #
 #   jobs:
 #     quality:
-#       uses: rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
+#       uses: cct-technology/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
 #       permissions: { contents: read, pull-requests: write }
 #       secrets: { QK_RELEASE_TOKEN: "${{ secrets.QK_RELEASE_TOKEN }}" }
 #
@@ -35,7 +35,7 @@ on:
         default: ""
     secrets:
       QK_RELEASE_TOKEN:
-        description: A token that can read the releases of rkvalvaa/cct-claude-plugins. Needed while that repository is private.
+        description: A token that can read the releases of cct-technology/cct-claude-plugins. Needed while that repository is private.
         required: false
 
 jobs:
@@ -68,8 +68,8 @@ jobs:
           dir="$RUNNER_TEMP/qk"
           mkdir -p "$dir"
           cd "$dir"
-          gh release download "v$VERSION" -R rkvalvaa/cct-claude-plugins -p "$asset" -p checksums.txt ||
-            problem "could not download $asset (set the QK_RELEASE_TOKEN secret while rkvalvaa/cct-claude-plugins is private)"
+          gh release download "v$VERSION" -R cct-technology/cct-claude-plugins -p "$asset" -p checksums.txt ||
+            problem "could not download $asset (set the QK_RELEASE_TOKEN secret while cct-technology/cct-claude-plugins is private)"
           # A mismatch may be a tampered release: fail loudly, never just warn.
           if ! awk -v a="$asset" '$2 == a' checksums.txt | sha256sum -c --status -; then
             echo "qk did not run: checksum mismatch for $asset, refusing it." > "$RUNNER_TEMP/qk-summary.txt"

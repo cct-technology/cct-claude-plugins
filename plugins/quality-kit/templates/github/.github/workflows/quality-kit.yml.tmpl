@@ -3,7 +3,7 @@ name: Quality Kit
 on: pull_request
 jobs:
   quality:
-    uses: rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@[[.Ref]]
+    uses: cct-technology/cct-claude-plugins/.github/workflows/quality.yml@[[.Ref]]
     permissions: { contents: read, pull-requests: write }
-    # While rkvalvaa/cct-claude-plugins is private, this secret is a token that can read its releases.
+    # While cct-technology/cct-claude-plugins is private, this secret is a token that can read its releases.
     secrets: { QK_RELEASE_TOKEN: "${{ secrets.QK_RELEASE_TOKEN }}" }

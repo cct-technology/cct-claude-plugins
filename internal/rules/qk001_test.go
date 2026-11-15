@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
 )
 
 func runRegisteredQK001(t *testing.T, l manifest.Loaded) check.Result {

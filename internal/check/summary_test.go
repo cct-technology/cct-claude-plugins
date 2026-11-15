@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 var summaryDay = time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC)

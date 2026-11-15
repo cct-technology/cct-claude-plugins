@@ -22,7 +22,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
-	qualitykit "github.com/rkvalvaa/cct-claude-plugins"
+	qualitykit "github.com/cct-technology/cct-claude-plugins"
 )
 
 // FileName is the manifest's name at the repo root.
@@ -263,7 +263,7 @@ func compileSchema() (*jsonschema.Schema, error) {
 	}
 	// An absolute URL: a relative one is resolved against the working directory,
 	// and the compiler then tries to read it from disk.
-	const url = "https://github.com/rkvalvaa/cct-claude-plugins/quality.schema.json"
+	const url = "https://github.com/cct-technology/cct-claude-plugins/quality.schema.json"
 	c := jsonschema.NewCompiler()
 	if err := c.AddResource(url, doc); err != nil {
 		return nil, err

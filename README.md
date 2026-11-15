@@ -88,14 +88,14 @@ You need:
 
 - Claude Code and git.
 - On Windows, [Git Bash](https://git-scm.com/downloads/win). The hooks are shell scripts.
-- Access to `rkvalvaa/cct-claude-plugins`, which is private, with git credentials Claude Code can use without asking: `gh auth login`, then `gh auth setup-git`.
+- Access to `cct-technology/cct-claude-plugins`, which is private, with git credentials Claude Code can use without asking: `gh auth login`, then `gh auth setup-git`.
 
 ### 1. Add the plugin to a repository
 
 From the root of the repository:
 
 ```sh
-claude plugin marketplace add rkvalvaa/cct-claude-plugins#v0.1.0 --scope project
+claude plugin marketplace add cct-technology/cct-claude-plugins#v0.1.0 --scope project
 claude plugin install quality-kit@cct-claude-plugins --scope project
 ```
 
@@ -109,7 +109,7 @@ The two commands write `.claude/settings.json`:
     "cct-claude-plugins": {
       "source": {
         "source": "github",
-        "repo": "rkvalvaa/cct-claude-plugins",
+        "repo": "cct-technology/cct-claude-plugins",
         "ref": "v0.1.0"
       }
     }

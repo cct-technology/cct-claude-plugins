@@ -17,10 +17,10 @@ import (
 	"strings"
 	"text/template"
 
-	qualitykit "github.com/rkvalvaa/cct-claude-plugins"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/host"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	qualitykit "github.com/cct-technology/cct-claude-plugins"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/host"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 // Options are the answers `qk init` is given.

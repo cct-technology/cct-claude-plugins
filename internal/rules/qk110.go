@@ -10,10 +10,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/glob"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/host"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/glob"
+	"github.com/cct-technology/cct-claude-plugins/internal/host"
 )
 
 func qk110() check.Rule {

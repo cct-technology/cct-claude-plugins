@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
+	"github.com/cct-technology/cct-claude-plugins/internal/deps"
 )
 
 // Output is a hook's JSON answer.

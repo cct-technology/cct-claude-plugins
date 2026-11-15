@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/deps"
+	"github.com/cct-technology/cct-claude-plugins/internal/rules"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 func runQK(t *testing.T, reg []check.Rule, args ...string) (code int, stdout, stderr string) {

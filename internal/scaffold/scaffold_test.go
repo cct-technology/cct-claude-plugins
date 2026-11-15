@@ -12,9 +12,9 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/rules"
 )
 
 const onGitHub = "https://github.com/acme/app.git"
@@ -354,8 +354,8 @@ func TestInitNamesTheStack(t *testing.T) {
 // CI checks with the qk that wrote the manifest.
 func TestInitPinsTheWorkflowToItsOwnRelease(t *testing.T) {
 	for version, want := range map[string]string{
-		"1.2.3": "rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@v1.2.3",
-		"dev":   "rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@main",
+		"1.2.3": "cct-technology/cct-claude-plugins/.github/workflows/quality.yml@v1.2.3",
+		"dev":   "cct-technology/cct-claude-plugins/.github/workflows/quality.yml@main",
 	} {
 		root := gitRepo(t, onGitHub, nil)
 		runInit(t, root, Options{Version: version})

@@ -88,7 +88,7 @@ esac
 [ -n "$os" ] && [ -n "$arch" ] || warn "no qk release for $(uname -s) $(uname -m)"
 
 asset=qk_${version}_${os}_${arch}.tar.gz
-base=https://github.com/rkvalvaa/cct-claude-plugins/releases/download/v$version
+base=https://github.com/cct-technology/cct-claude-plugins/releases/download/v$version
 
 mkdir -p "$cache" 2>/dev/null || warn "could not create $cache"
 # In the cache directory so the final mv is atomic and concurrent hooks are safe.

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
 )
 
 // generatorTimeout bounds one generator run, so a hung one cannot hold CI for hours.

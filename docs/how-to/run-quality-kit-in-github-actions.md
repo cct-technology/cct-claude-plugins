@@ -11,7 +11,7 @@ name: Quality Kit
 on: pull_request
 jobs:
   quality:
-    uses: rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
+    uses: cct-technology/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
     permissions: { contents: read, pull-requests: write }
     secrets: { QK_RELEASE_TOKEN: "${{ secrets.QK_RELEASE_TOKEN }}" }
 ```
@@ -20,8 +20,8 @@ Use the tag of the plugin version your repository runs. The workflow installs th
 
 ## While the Quality Kit repository is private
 
-1. In `rkvalvaa/cct-claude-plugins`, go to **Settings → Actions → General → Access** and choose **Accessible from repositories owned by 'rkvalvaa' user**. Only private repositories with the same owner can then call the workflow.
-2. Create a fine-grained personal access token with read access to **Contents** of `rkvalvaa/cct-claude-plugins`.
+1. In `cct-technology/cct-claude-plugins`, go to **Settings → Actions → General → Access** and choose **Accessible from repositories owned by 'rkvalvaa' user**. Only private repositories with the same owner can then call the workflow.
+2. Create a fine-grained personal access token with read access to **Contents** of `cct-technology/cct-claude-plugins`.
 3. In your repository, add it under **Settings → Secrets and variables → Actions** as `QK_RELEASE_TOKEN`.
 
 Without the token, the job warns `could not download qk_...` and passes, and the comment says qk did not run.
@@ -40,7 +40,7 @@ The comment, the artifact and the job result come from one `qk check` run, so th
 The workflow installs only `qk`. Two checks run other tools: QK020 runs every command listed under `generated` in `quality.yaml`, and QK030 runs `oasdiff`. Give the job those tools with `setup`: shell commands that run in the root of your repository before `qk check`.
 
 ```yaml
-    uses: rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
+    uses: cct-technology/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
     with:
       setup: |
         npm ci
@@ -83,7 +83,7 @@ QK060 needs no setup. It asks the public package registries from the runner abou
 ## Show findings in code scanning
 
 ```yaml
-    uses: rkvalvaa/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
+    uses: cct-technology/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
     with: { code-scanning: true }
     permissions: { contents: read, pull-requests: write, security-events: write, actions: read }
 ```
