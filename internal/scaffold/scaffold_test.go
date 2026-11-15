@@ -376,9 +376,10 @@ func TestInitPinsTheWorkflowToItsOwnRelease(t *testing.T) {
 		if job.Uses != want || wf.On != "pull_request" {
 			t.Errorf("qk %s: workflow runs %q on %q, want %q on pull_request", version, job.Uses, wf.On, want)
 		}
-		// The comment needs pull-requests: write; the secret is passed on as GitHub writes it.
-		if job.Permissions["pull-requests"] != "write" || job.Secrets["QK_RELEASE_TOKEN"] != "${{ secrets.QK_RELEASE_TOKEN }}" {
-			t.Errorf("qk %s: job = %+v, want the permissions and the secret of the how-to", version, job)
+		// The comment needs pull-requests: write. The release is public, so no
+		// secret is passed: one the reusable workflow does not declare fails the caller.
+		if job.Permissions["pull-requests"] != "write" || len(job.Secrets) != 0 {
+			t.Errorf("qk %s: job = %+v, want the permissions of the how-to and no secrets", version, job)
 		}
 	}
 }

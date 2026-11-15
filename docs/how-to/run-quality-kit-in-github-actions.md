@@ -13,18 +13,9 @@ jobs:
   quality:
     uses: cct-technology/cct-claude-plugins/.github/workflows/quality.yml@v0.1.0
     permissions: { contents: read, pull-requests: write }
-    secrets: { QK_RELEASE_TOKEN: "${{ secrets.QK_RELEASE_TOKEN }}" }
 ```
 
-Use the tag of the plugin version your repository runs. The workflow installs the `qk` release with that version and verifies it against the release's `checksums.txt`.
-
-## While the Quality Kit repository is private
-
-1. In `cct-technology/cct-claude-plugins`, go to **Settings → Actions → General → Access** and choose **Accessible from repositories owned by 'rkvalvaa' user**. Only private repositories with the same owner can then call the workflow.
-2. Create a fine-grained personal access token with read access to **Contents** of `cct-technology/cct-claude-plugins`.
-3. In your repository, add it under **Settings → Secrets and variables → Actions** as `QK_RELEASE_TOKEN`.
-
-Without the token, the job warns `could not download qk_...` and passes, and the comment says qk did not run.
+Use the tag of the plugin version your repository runs. The workflow installs the `qk` release with that version and verifies it against the release's `checksums.txt`. The Quality Kit repository is public, so the job needs no token or secret of yours, and a repository of any owner can call the workflow.
 
 ## What you get
 

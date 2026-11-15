@@ -6,7 +6,6 @@ You need:
 
 - Claude Code, git and Go.
 - On Windows, [Git Bash](https://git-scm.com/downloads/win). Run the commands below in it.
-- Access to `cct-technology/cct-claude-plugins`, with `gh auth login` and `gh auth setup-git` done.
 - `qk` on your `PATH`: follow [Get the qk binary](../how-to/get-the-qk-binary.md), then check it:
 
   ```sh

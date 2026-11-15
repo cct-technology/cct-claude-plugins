@@ -88,7 +88,6 @@ You need:
 
 - Claude Code and git.
 - On Windows, [Git Bash](https://git-scm.com/downloads/win). The hooks are shell scripts.
-- Access to `cct-technology/cct-claude-plugins`, which is private, with git credentials Claude Code can use without asking: `gh auth login`, then `gh auth setup-git`.
 
 ### 1. Add the plugin to a repository
 
@@ -128,7 +127,7 @@ claude plugin install quality-kit@cct-claude-plugins --scope project
 
 ### 2. Get qk
 
-The hooks run `qk`. The plugin downloads the right version by itself from a public release. That does not work yet: there is no release, and a download from a private repository needs you to sign in. Until both change, put `qk` on your `PATH` yourself: [Get the qk binary](docs/how-to/get-the-qk-binary.md).
+The hooks run `qk`. The plugin downloads the right version by itself from a release. That does not work yet: there is no release. Until there is one, put `qk` on your `PATH` yourself: [Get the qk binary](docs/how-to/get-the-qk-binary.md).
 
 ### 3. Set the repository up
 
