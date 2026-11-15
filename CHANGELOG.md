@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-15
+
+The first release.
+
 ### Changed
 
 - The repository is public, so nothing needs a token to read it. The reusable workflow `.github/workflows/quality.yml` no longer takes the `QK_RELEASE_TOKEN` secret, and the workflow `qk init` writes no longer passes it. A workflow that still passes the secret is refused by GitHub: remove its `secrets:` line. The steps for a private Quality Kit repository are gone from the docs: the access setting for the reusable workflow, the token, `gh auth setup-git` before the install, and the download with `gh`.

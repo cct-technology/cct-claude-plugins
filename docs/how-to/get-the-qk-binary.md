@@ -1,9 +1,6 @@
 # Get the qk binary
 
-Quality Kit's hooks need the `qk` binary. The plugin ships a small script, `bin/qk`, that finds the right one. Once the first release is out you do nothing: the first hook that needs `qk` downloads it.
-
-> [!NOTE]
-> Today you install `qk` yourself. The download needs a release, and there is none yet: `v0.1.0` is not tagged. See [Install qk yourself](#install-qk-yourself).
+Quality Kit's hooks need the `qk` binary. The plugin ships a small script, `bin/qk`, that finds the right one. You do nothing: the first hook that needs `qk` downloads it. To run `qk` in your own terminal, see [Install qk yourself](#install-qk-yourself).
 
 ## How the plugin finds qk
 
@@ -17,11 +14,11 @@ If all three fail, it prints a warning on stderr and exits 0. The check does not
 
 ## Install qk yourself
 
-Do this before the first release, or on a machine with no access to GitHub. `<version>` is the `version` in the plugin's `plugin.json`.
+Do this to run `qk` in your own terminal, on a machine with no access to GitHub, or to use a `qk` you built. The copy the plugin downloads is in its cache, not on your `PATH`. `<version>` is the `version` in the plugin's `plugin.json`.
 
 On Windows, run the commands in Git Bash, and write `qk.exe` wherever a command names the file `qk`. The plugin looks for that name, and does not find a file named `qk`.
 
-**Before the first release**, build `qk` from a clone. This needs Go:
+**From source**, build `qk` from a clone. This needs Go:
 
 ```sh
 git clone https://github.com/cct-technology/cct-claude-plugins

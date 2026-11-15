@@ -34,7 +34,7 @@ Nothing is pushed in this tutorial. The remote is there so Quality Kit knows the
 ## 2. Install the plugin
 
 ```sh
-claude plugin marketplace add cct-technology/cct-claude-plugins#main --scope project
+claude plugin marketplace add cct-technology/cct-claude-plugins#v0.1.0 --scope project
 claude plugin install quality-kit@cct-claude-plugins --scope project
 ```
 
@@ -46,7 +46,7 @@ The last line you see is:
 
 Both commands wrote to `.claude/settings.json`. In a real repository you commit that file, so your teammates get the plugin too.
 
-`#main` follows the newest Quality Kit. Once `v0.1.0` is released, use `#v0.1.0` in a real repository, so it stays on a version you chose.
+`#v0.1.0` keeps the repository on a version you chose. `#main` would follow the newest Quality Kit.
 
 ## 3. Let Claude set the repository up
 

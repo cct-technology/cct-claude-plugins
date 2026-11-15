@@ -11,7 +11,7 @@ It has three parts:
 It works in any git repository with no configuration. Without a `quality.yaml`, every check warns and nothing blocks.
 
 > [!NOTE]
-> **Status: Phase 1, before the first release.** No `v0.1.0` tag exists yet, so there is no `qk` to download: see [Get qk](#2-get-qk). Everything on this page is built. The plan for later phases is in [`docs/SPEC.md`](docs/SPEC.md#10-phases-and-acceptance-criteria).
+> **Status: Phase 1, released as `v0.1.0`.** Everything on this page is built. The plan for later phases is in [`docs/SPEC.md`](docs/SPEC.md#10-phases-and-acceptance-criteria).
 
 ## What it does
 
@@ -98,8 +98,6 @@ claude plugin marketplace add cct-technology/cct-claude-plugins#v0.1.0 --scope p
 claude plugin install quality-kit@cct-claude-plugins --scope project
 ```
 
-Until `v0.1.0` is released, use `#main` instead of `#v0.1.0`.
-
 The two commands write `.claude/settings.json`:
 
 ```json
@@ -127,7 +125,7 @@ claude plugin install quality-kit@cct-claude-plugins --scope project
 
 ### 2. Get qk
 
-The hooks run `qk`. The plugin downloads the right version by itself from a release. That does not work yet: there is no release. Until there is one, put `qk` on your `PATH` yourself: [Get the qk binary](docs/how-to/get-the-qk-binary.md).
+The hooks run `qk`. You do nothing: the first hook that needs it downloads the right version from the release and checks it against the release's checksums. To run `qk` in your own terminal, or on a machine with no access to GitHub, install it yourself: [Get the qk binary](docs/how-to/get-the-qk-binary.md).
 
 ### 3. Set the repository up
 
