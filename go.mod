@@ -1,4 +1,4 @@
-module github.com/rkvalvaa/cct-claude-plugins
+module github.com/cct-technology/cct-claude-plugins
 
 go 1.27.3
 

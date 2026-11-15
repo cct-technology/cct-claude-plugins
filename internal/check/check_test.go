@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 func rule(id, key string, from Maturity, res Result) Rule {

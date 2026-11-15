@@ -10,10 +10,10 @@ import (
 	"os"
 	"path/filepath"
 
-	qualitykit "github.com/rkvalvaa/cct-claude-plugins"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
+	qualitykit "github.com/cct-technology/cct-claude-plugins"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/rules"
 )
 
 func main() {

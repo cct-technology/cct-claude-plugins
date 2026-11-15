@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
 )
 
 // Guards every rule added to the registry: stable QKnnn IDs, no duplicates,

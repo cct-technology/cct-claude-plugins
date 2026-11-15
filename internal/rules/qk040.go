@@ -11,8 +11,8 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
 )
 
 // The folders from the manifest example in docs/SPEC.md §3.

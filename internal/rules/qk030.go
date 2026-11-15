@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
 )
 
 // oasdiffTimeout bounds one comparison: a `$ref` to a slow URL must not hold the Stop hook.

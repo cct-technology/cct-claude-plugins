@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
 )
 
 // Host is a git host qk knows something about.

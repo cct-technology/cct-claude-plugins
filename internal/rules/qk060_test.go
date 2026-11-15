@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/deps"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 var qk060Today = time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)

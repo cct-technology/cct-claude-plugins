@@ -18,7 +18,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/glob"
+	"github.com/cct-technology/cct-claude-plugins/internal/glob"
 )
 
 // FileName is the waivers file, relative to the repo root.

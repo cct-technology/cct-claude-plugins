@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
 )
 
 func runRegisteredQK061(t *testing.T, ctx check.Context) check.Result {

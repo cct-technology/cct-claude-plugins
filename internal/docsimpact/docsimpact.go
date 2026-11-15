@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 // Dir holds the notes, relative to the repo root.

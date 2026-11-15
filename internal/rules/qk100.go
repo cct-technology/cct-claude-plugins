@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 func qk100() check.Rule {

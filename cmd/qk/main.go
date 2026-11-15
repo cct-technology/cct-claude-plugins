@@ -20,15 +20,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/docsimpact"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/hook"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/rules"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/scaffold"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/deps"
+	"github.com/cct-technology/cct-claude-plugins/internal/docsimpact"
+	"github.com/cct-technology/cct-claude-plugins/internal/hook"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/rules"
+	"github.com/cct-technology/cct-claude-plugins/internal/scaffold"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 // version is set at release time with -ldflags "-X main.version=<tag>".

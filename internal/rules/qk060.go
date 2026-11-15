@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/deps"
 )
 
 // registry is what QK060 asks about a package. Tests point it at a fake.

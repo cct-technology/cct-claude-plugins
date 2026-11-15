@@ -7,7 +7,7 @@ import (
 
 	"mvdan.cc/sh/v3/syntax"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
+	"github.com/cct-technology/cct-claude-plugins/internal/deps"
 )
 
 // installs returns the registry packages a shell line asks a package manager

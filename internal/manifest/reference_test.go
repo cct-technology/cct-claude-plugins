@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	qualitykit "github.com/rkvalvaa/cct-claude-plugins"
+	qualitykit "github.com/cct-technology/cct-claude-plugins"
 )
 
 func TestWriteReference(t *testing.T) {

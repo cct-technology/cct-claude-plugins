@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/deps"
+	"github.com/cct-technology/cct-claude-plugins/internal/deps"
 )
 
 // testGuards knows one generated file and three packages: `left-pad` is fine,

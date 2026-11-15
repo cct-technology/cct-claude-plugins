@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/changes"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/waivers"
+	"github.com/cct-technology/cct-claude-plugins/internal/changes"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/waivers"
 )
 
 var impactMap = []manifest.ImpactEntry{

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
 )
 
 // The test binary is also the fake generator: `rules.test qkgen file=content ...`

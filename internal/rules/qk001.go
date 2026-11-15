@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rkvalvaa/cct-claude-plugins/internal/check"
-	"github.com/rkvalvaa/cct-claude-plugins/internal/manifest"
+	"github.com/cct-technology/cct-claude-plugins/internal/check"
+	"github.com/cct-technology/cct-claude-plugins/internal/manifest"
 )
 
 func qk001() check.Rule {

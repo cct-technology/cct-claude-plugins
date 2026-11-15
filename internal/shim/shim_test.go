@@ -399,7 +399,7 @@ func TestDownloadsVerifiesAndCaches(t *testing.T) {
 	code, stdout, stderr := s.run("", "version")
 
 	s.wantRan(stdout, stderr, code)
-	base := "https://github.com/rkvalvaa/cct-claude-plugins/releases/download/v" + required + "/"
+	base := "https://github.com/cct-technology/cct-claude-plugins/releases/download/v" + required + "/"
 	got := strings.Join(s.downloads(), " ")
 	for _, want := range []string{base + archiveName(), base + "checksums.txt"} {
 		if !strings.Contains(got, want) {

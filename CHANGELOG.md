@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The repository moved to `cct-technology/cct-claude-plugins`. Everything that names it follows: the Go module path (`github.com/cct-technology/cct-claude-plugins`), the address `bin/qk` and the reusable workflow download `qk` from, the `uses:` line of the workflow `qk init` writes, the schema's address, and the install commands in the docs (`claude plugin marketplace add cct-technology/cct-claude-plugins`). Nothing was released under the old address. A clone of the old address still works through GitHub's redirect; point it at the new one with `git remote set-url origin https://github.com/cct-technology/cct-claude-plugins.git`.
+
 ### Fixed
 
 - The PreToolUse hook tells reads from writes. A shell command that only reads `quality.yaml` or `.quality/` (`cat`, `grep`, `ls`, `test -f`, `diff`, `git diff`, `Get-Content` and the like) no longer asks a person, and neither do `git add`, `git commit`, `git tag` and `git branch`. Before, any command that named one of them asked, with a prompt that said an exception was being changed. Only a plain read passes, and the hook lists what that is: every command on the line is one that only reads, or one of `qk`, `cd`, `which`, `type` and `command -v` beside it; every word is written out in full, with no variable and no substitution other than `$(git merge-base ...)`; the commands are joined by `;`, `&&`, `||`, `|`, `if`, `( )` or `{ }`; and no output goes to the path. Everything else that names one of them still asks, so some reads ask: `cat "$HOME/repo/quality.yaml"`, `sed -n 1,5p quality.yaml`, a read beside `make`. The prompt for such a line says it is not a plain read and that a read on its own line needs no approval, so Claude reads again by itself when nobody approves. Bash lines are parsed, with the parser of `shfmt` (`mvdan.cc/sh`, a new dependency). PowerShell lines are not: the same rules are applied to their text. The two names now count in any case, as Windows and macOS read them, so `QUALITY.YAML` asks. How-to: `docs/how-to/work-with-the-hooks.md`.
