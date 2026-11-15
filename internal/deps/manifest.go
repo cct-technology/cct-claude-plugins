@@ -293,7 +293,7 @@ func pyprojectDeps(data []byte) []Package {
 		if (e.table == "project" && e.key == "dependencies") || e.table == "project.optional-dependencies" || e.table == "dependency-groups" {
 			// `{include-group = "test"}` names another group, not a package.
 			for _, m := range tomlString.FindAllStringSubmatch(tomlInlineTable.ReplaceAllString(e.value, ""), -1) {
-				if p, ok := requirement(m[1] + m[2]); ok {
+				if p, ok := Requirement(m[1] + m[2]); ok {
 					pkgs = append(pkgs, p)
 				}
 			}
@@ -308,7 +308,7 @@ func requirementsDeps(data []byte) []Package {
 		if at := strings.Index(line, " #"); at >= 0 {
 			line = line[:at]
 		}
-		if p, ok := requirement(line); ok {
+		if p, ok := Requirement(line); ok {
 			pkgs = append(pkgs, p)
 		}
 	}
@@ -317,9 +317,9 @@ func requirementsDeps(data []byte) []Package {
 
 var requirementLine = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*([^;]*)`)
 
-// requirement reads one requirement string, such as `uvicorn[standard]~=0.30 ; python_version >= "3.9"`.
+// Requirement reads one requirement string, such as `uvicorn[standard]~=0.30 ; python_version >= "3.9"`.
 // Options (-r, -e), comments, URLs and `name @ url` are not registry packages.
-func requirement(line string) (Package, bool) {
+func Requirement(line string) (Package, bool) {
 	line = strings.TrimSpace(line)
 	m := requirementLine.FindStringSubmatch(line)
 	if m == nil || strings.Contains(line, "://") {

@@ -62,4 +62,4 @@ qk check --full
 
 Leave the files alone while it runs: an edit made during the run can be lost. See [run the slow checks](run-qk-check.md#run-the-slow-checks).
 
-When it fails, run the command it names and commit what it writes. Don't edit a generated file by hand.
+When it fails, run the command it names and commit what it writes. Don't edit a generated file by hand. When Claude tries to, the edit is [blocked](work-with-the-hooks.md#when-an-edit-to-a-generated-file-is-blocked) and Claude is told which command to run.

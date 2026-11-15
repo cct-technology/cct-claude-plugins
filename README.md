@@ -11,7 +11,7 @@ It has three parts:
 It works in any git repository with no configuration. Without a `quality.yaml`, every check warns and nothing blocks.
 
 > [!NOTE]
-> **Status: Phase 1, before the first release.** No `v0.1.0` tag exists yet, so there is no `qk` to download: see [Get qk](#2-get-qk). Parts marked **Coming** below are specified and not built. The plan for later phases is in [`docs/SPEC.md`](docs/SPEC.md#10-phases-and-acceptance-criteria).
+> **Status: Phase 1, before the first release.** No `v0.1.0` tag exists yet, so there is no `qk` to download: see [Get qk](#2-get-qk). Everything on this page is built. The plan for later phases is in [`docs/SPEC.md`](docs/SPEC.md#10-phases-and-acceptance-criteria).
 
 ## What it does
 
@@ -58,10 +58,10 @@ With the plugin enabled, the hooks run in every session. Details: [Work with Qua
 | A session starts | Claude gets a short summary: maturity, which checks are enforced, open findings, waivers ending soon. |
 | Claude tries to finish | `qk check --changed` runs. An enforced failure sends Claude back with the findings, at most twice in a row; then a person takes over. Advisory findings are shown to you. |
 | Claude records an exception, or could change `.quality/` or `quality.yaml` | Claude Code asks a person first. Reading those files asks nobody. |
-| Claude edits a generated file | Coming (CCT-3442): the edit is blocked, and Claude is told which generator to run. |
-| Claude installs a package | Coming (CCT-3442): the install is blocked when the package does not exist or is too new. |
+| Claude edits a generated file | The edit is blocked, and Claude is told which generator to run. |
+| Claude installs a package | The install is blocked when the package does not exist in its registry, or the version is less than 14 days old. |
 
-A problem with Quality Kit itself never blocks: see [why Quality Kit fails open](docs/explanation/fail-open.md).
+The two blocks apply where their check is enforced. Where it is advisory, Claude is told and nothing is blocked. A problem with Quality Kit itself never blocks: see [why Quality Kit fails open](docs/explanation/fail-open.md).
 
 ### The `qk` command
 

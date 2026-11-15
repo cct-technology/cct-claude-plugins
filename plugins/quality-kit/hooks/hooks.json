@@ -1,5 +1,5 @@
 {
-  "description": "Quality Kit: a summary when a session starts, a person's approval before Claude records an exception, and a check before Claude stops.",
+  "description": "Quality Kit: a summary when a session starts; before a tool runs, a person's approval for an exception, and a block on edits to generated files and on installs of packages that do not exist or are too new; and a check before Claude stops.",
   "hooks": {
     "SessionStart": [
       {

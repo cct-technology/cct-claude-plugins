@@ -198,7 +198,7 @@ func TestPreToolUseAsksAPersonForExceptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out, err := PreToolUse([]byte(tt.input))
+			out, err := PreToolUse([]byte(tt.input), Guards{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -283,7 +283,7 @@ func TestPreToolUseStaysOutOfTheWay(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out, err := PreToolUse([]byte(tt.input))
+			out, err := PreToolUse([]byte(tt.input), Guards{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -310,7 +310,7 @@ func TestPreToolUseSaysHowToReadWhenALineIsNotAPlainRead(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out, err := PreToolUse([]byte(tt.input))
+			out, err := PreToolUse([]byte(tt.input), Guards{})
 			if err != nil || out == nil {
 				t.Fatalf("out = %v, err = %v, want ask", out, err)
 			}
@@ -322,7 +322,7 @@ func TestPreToolUseSaysHowToReadWhenALineIsNotAPlainRead(t *testing.T) {
 }
 
 func TestPreToolUseMalformedInputIsAnError(t *testing.T) {
-	if out, err := PreToolUse([]byte("not json")); err == nil || out != nil {
+	if out, err := PreToolUse([]byte("not json"), Guards{}); err == nil || out != nil {
 		t.Errorf("out = %+v, err = %v", out, err)
 	}
 }
